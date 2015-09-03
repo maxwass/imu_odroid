@@ -1,10 +1,10 @@
-#include <stdio.h>
+#include <stdio.h>   /* Standard input/output definitions */
 #include <stdlib.h>
-#include <unistd.h>
+#include <unistd.h>  /* UNIX standard function definitions */
 #include <sys/time.h>
 #include <math.h>
-#include <fcntl.h>
-#include <termios.h>
+#include <fcntl.h>   /* File control definitions */
+#include <termios.h> /* POSIX terminal control definitions, Unix API for terminal I/O */
 
 //things to check: baudrate on this and imu, path to serial port
 
@@ -17,17 +17,26 @@ double theta, phi, psi, theta_dot, phi_dot, psi_dot;
 
 int open_port()
 {
-    //termios - Unix API for terminal I/O
-    
     //port = open(path, O_RDWR | O_NOCTTY)
         //port        - The returned file handle for the device. -1 if an error occurred
         //path        - The path to the serial port (e.g. /dev/ttyS0)
         //"O_RDWR"    - Opens the port for reading and writing
         //"O_NOCTTY"  - The port never becomes the controlling terminal of the process.
     struct termios newtio;
-	int port;
-
-	port = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY);
+	int port; /* File descriptor for the port */
+    
+    // /dev/ttyUSB0
+	port = open("/dev/ttySAC0", O_RDWR | O_NOCTTY);
+    
+    if (port == -1)
+    {
+        /*
+         * Could not open the port.
+         */
+        
+        perror("open_port: Unable to open /dev/ttyUSB0 - ");
+    }
+    
 /* Daewon suggested this is not needed: try commenting out
 //	tcgetattr(port, &newtio);
 //	cfsetospeed(&newtio, BAUDRATE);
