@@ -16,6 +16,11 @@ typedef struct imu_data {
     double theta, phi, psi, theta_dot, phi_dot, psi_dot;
 } SImu_data ;
 
+typedef struct state {
+    //WHY are using float instead of double??? if double will do replace data structure imu_data with this
+    float theta, phi, psi, theta_dot, phi_dot, psi_dot;
+} Sstate ;
+
 using namespace std;
 
 int open_port()
@@ -86,6 +91,17 @@ void print_data(SImu_data  &imu_data)
     cout << "     psi_dot: " << imu_data.psi_dot << endl;
 }
 
+void unpack_data(SImu_data imu_data, unsigned char arr[]){
+//distributes data from the input buffer to the imu_data data structure
+    imu_data.psi = *(float *)&arr[0];
+    imu_data.theta = *(float *)&arr[4];
+    imu_data.phi = *(float *)&arr[8];
+    imu_data.phi_dot = *(float *)&arr[12];
+    imu_data.theta_dot = *(float *)&arr[16];
+    imu_data.psi_dot =  *(float *)&arr[20];
+    
+}
+
 imu_data get_data(int port)
 {
     unsigned char sensor_bytes2[24];
@@ -106,18 +122,7 @@ imu_data get_data(int port)
         printf("get_data: FAILED read from port \n");
     }
     
-    imu_data.psi = *(float *)&sensor_bytes2[0];
-    imu_data.theta = *(float *)&sensor_bytes2[4];
-    imu_data.phi = *(float *)&sensor_bytes2[8];
-    imu_data.phi_dot = *(float *)&sensor_bytes2[12];
-    imu_data.theta_dot = *(float *)&sensor_bytes2[16];
-    imu_data.psi_dot =  *(float *)&sensor_bytes2[20];
-    
-    //note about C++: functions/methods default pass by value.  In print_data,
-    //	I instructed it to accept the memory address of an SImu_data structure,
-    // 	and when an SImu_data object is passed in, it automatically takes the address.
-    //print_data(imu_data);
-    
+    unpack_data(imu_data, sensor_bytes2);
     
     return imu_data;
 }
