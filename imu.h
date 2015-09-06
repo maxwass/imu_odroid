@@ -12,14 +12,21 @@
 #define BAUDRATE B57600
 #define MY_PATH "/dev/ttySAC0"
 
-typedef struct imu_data {
-    double theta, phi, psi, theta_dot, phi_dot, psi_dot;
-} SImu_data ;
-
 typedef struct state {
-    //WHY are using float instead of double??? if double will do replace data structure imu_data with this
-    float theta, phi, psi, theta_dot, phi_dot, psi_dot;
+    double theta, phi, psi, theta_dot, phi_dot, psi_dot;
 } Sstate ;
+
+typedef struct desired {
+    double theta, phi, psi;d
+} Sdesired ;
+
+typedef struct control_command {
+    double thrust, roll_acc, pitch_acc, yaw_acc;
+} Scontrol_command;
+
+typedef struct forces {
+    double motor_1, motor_2, motor_3, motor_3;
+} Sforces;
 
 using namespace std;
 
@@ -71,7 +78,7 @@ int open_port()
     newtio.c_cflag |= (CLOCAL | CREAD);
     
     //Set the new options for the port...
-    int status=tcsetattr(port, TCSANOW, &newtio);
+    int status = tcsetattr(port, TCSANOW, &newtio);
     
     if (status != 0){ //For error message
         printf("Configuring comport failed\n");
@@ -81,7 +88,7 @@ int open_port()
     return port;
 }
 
-void print_data(SImu_data  &imu_data)
+void print_data(const Sstate  &imu_data)
 {
     cout << "theta:      " << imu_data.theta;
     cout << "  phi:    " << imu_data.phi;
@@ -91,8 +98,11 @@ void print_data(SImu_data  &imu_data)
     cout << "     psi_dot: " << imu_data.psi_dot << endl;
 }
 
-void unpack_data(SImu_data imu_data, unsigned char arr[]){
+void unpack_data(Sstate &imu_data, unsigned char arr[]){
 //distributes data from the input buffer to the imu_data data structure
+    //we make a char[] to recieve imu data (imu outputs byte by byte)
+    //the cast to a float pointer takes the first four bytes in the array 'arr',
+    //thus constructing a float
     imu_data.psi = *(float *)&arr[0];
     imu_data.theta = *(float *)&arr[4];
     imu_data.phi = *(float *)&arr[8];
@@ -102,29 +112,22 @@ void unpack_data(SImu_data imu_data, unsigned char arr[]){
     
 }
 
-imu_data get_data(int port)
+void get_data(const int port, Sstate &imu_data)
 {
     unsigned char sensor_bytes2[24];
-    
-    int result;
-    
-    //instantiate SIMU_data type
-    SImu_data  imu_data;
     
     //flush input buffer (TCI for input)
     tcflush(port, TCIFLUSH);
     
     //read in 24 bytes of data from port to the address in memory &sensor_bytes2
     //result1 indicates success of reading
-    result = read(port, &sensor_bytes2[0], 24);
+    int result = read(port, &sensor_bytes2[0], 24);
     
     if (result == -1){ //For error message
         printf("get_data: FAILED read from port \n");
     }
     
     unpack_data(imu_data, sensor_bytes2);
-    
-    return imu_data;
 }
 
 
@@ -134,10 +137,11 @@ int main (void)
     /* File descriptor for the port */
     int port = open_port(); 
     
-    SImu_data imu_data;
+    //instantiate imu_data ==> scope is over while loop. Same imu_data will be overwritten repeatedly
+    Sstate imu_data;
     while(1)
-    {
-        imu_data = get_data(port);
+    {   //pull data from sensor and put into imu_data
+        get_data(port, imu_data);
         print_data(imu_data);
     }
     
