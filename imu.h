@@ -17,7 +17,7 @@ typedef struct state {
 } Sstate ;
 
 typedef struct desired {
-    double theta, phi, psi;d
+    double theta, phi, psi;
 } Sdesired ;
 
 typedef struct control_command {
@@ -25,7 +25,7 @@ typedef struct control_command {
 } Scontrol_command;
 
 typedef struct forces {
-    double motor_1, motor_2, motor_3, motor_3;
+    double motor_1, motor_2, motor_3, motor_4;
 } Sforces;
 
 using namespace std;
