@@ -1,63 +1,40 @@
-#include <pthread.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <string.h>
-#include <stdio.h>
 #include "imu.h"
-#include "receiver.h"
-#include <math.h>
-#include <stdint.h>
+#include "motor_test.h"
+#include "motor.h"
 
-#define NUM_THREADS 3
-#define XBEE_START_BYTE 0xBD
-#define PI 3.14159265359
 
 pthread_mutex_t data_acq_mutex; 
 pthread_cond_t data_acq_cv;
 
 struct timeval t_init, t_now, t_now_v;
 double t_v, del_t_v, t_prev_v = 0.0;
-bool SYSTEM_RUN = true;
-bool CONTROLLER_RUN = false;
-bool DISPLAY_RUN = true;
+volatile bool SYSTEM_RUN = true;
+volatile bool CONTROLLER_RUN = false;
+volatile bool DISPLAY_RUN = true;
+
  int i2cHandle, usb_imu, usb_xbee, res1;
  int motor_out[4] = {30, 30, 30, 30};
  int F_init = 30;
-float phi_d = 0.0;
-float theta_d = 0.0;
-float psi_d = 0.0;
-float e_phi, e_phi_dot, e_theta, e_theta_dot, e_psi, e_psi_dot;
-int U[4], U_trim[4], ff[4];
+
 float psi_init;
 double Ct=0.013257116418667*10;
 double d=0.169;
 
-float kp_phi = 5.5;
-float kd_phi = 0.32;
 
-float kp_theta = 5.5;
-float kd_theta = 0.32;
+Sdesired desired_angles;
+set_desired_angles(desired_angles);
 
-float kp_psi = 5.2;
-float kd_psi = 0.3;
+Sstate gains;
+set_gains(gains);
 
-typedef struct gains {
-    float kp_theta, kp_phi, kp_psi, kd_theta, kd_phi, kd_psi;
-} Sgains ;
+Scontrol_command U_trim;
+set_Utrim(U_trim);
 
-Sgains gains;
-gains.kp_theta = 5.5;
-gains.kd_theta = 0.32;
-
-gains.kp_phi = 5.5;
-gains.kd_phi = 0.32;
-
-gains.kp_psi = 5.2;
-gains.kd_psi = 0.3;
+//create our motor objects
+motor motor_1 = new motor(1);
+motor motor_2 = new motor(2);
+motor motor_3 = new motor(3);
+motor motor_4 = new motor(4);
 
 
 //executes input from host computer on motors, controller gains, displays, and controller
@@ -102,14 +79,14 @@ void *command_input(void *thread_id)
             case '2':
             case '3':
             case '4':
-                start_motor(motor_out, command);
+                start_motors();
                 break;
                 
             case '5':
             case 'q':
             case 'Q':
                 printf("Motor Stop!\n");
-                for(int i = 0; i<4; i++) { motor_out[i] = 0; }
+                stop_motors();
                 CONTROLLER_RUN = false;
                 break;
                 
@@ -138,53 +115,53 @@ void *command_input(void *thread_id)
             case 'w':
             case 'W':
                 printf("Increase kp_phi and kp_theta\n");
-                kp_phi = kp_phi + 0.1;
-                kp_theta = kp_theta + 0.1;
+                gains.kp_phi   = gains.kp_phi   + 0.1;
+                gains.kp_theta = gains.kp_theta + 0.1;
                 break;
                 
             case 's':
             case 'S':
                 printf("Decrease kp_phi and kp_theta\n");
-                kp_phi = kp_phi - 0.1;
-                kp_theta = kp_theta - 0.1;
+                gains.kp_phi   = gains.kp_phi   - 0.1;
+                gains.kp_theta = gains.kp_theta - 0.1;
                 break;
                 
             case 'e':
             case 'E':
                 printf("Increase kd_phi and kd_theta\n");
-                kd_phi = kd_phi + 0.03;
-                kd_theta = kd_theta + 0.03;
+                gains.kd_phi   = gains.kd_phi   + 0.3;
+                gains.kd_theta = gains.kd_theta + 0.3;
                 break;
                 
             case 'd':
             case 'D':
                 printf("Decrease kd_phi and kd_theta\n");
-                kd_phi = kd_phi - 0.03;
-                kd_theta = kd_theta - 0.03;
+                gains.kd_phi   = gains.kd_phi   - 0.3;
+                gains.kd_theta = gains.kd_theta - 0.3;
                 break;
                 
             case 'k':
             case 'K':
                 printf("Increase theta_d ('theta desired') \n");
-                theta_d = theta_d + 1.0;
+                gains.theta_d = gains.theta_d + 1.0;
                 break;
                 
             case 'i':
             case 'I':
                 printf("Decrease theta_d ('theta desired') \n");
-                theta_d = theta_d - 1.0;
+                gains.theta_d = gains.theta_d - 1.0;
                 break;
                 
             case 'l':
             case 'L':
                 printf("Increase phi_d ('phi desired') \n");
-                phi_d = phi_d + 1.0;
+                gains.phi_d = gains.phi_d + 1.0;
                 break;
                 
             case 'j':
             case 'J':
                 printf("Decrease phi_d ('phi desired') \n");
-                phi_d = phi_d - 1.0;
+                gains.phi_d = gains.phi_d - 1.0;
                 break;
                 
             default:
@@ -211,10 +188,8 @@ void *control_stabilizer(void *thread_id)
  int start_motor = 0x10; //16
     
     while(SYSTEM_RUN == true) {
-  
-    //duplicate action in imu.h, why not use that function????
         
-	SImu_data imu_data;
+	Sstate imu_data;
 	tcflush(usb_imu, TCIFLUSH);
 	res1 = read(usb_imu,&sensor_bytes2[0],24);
         
@@ -231,19 +206,17 @@ void *control_stabilizer(void *thread_id)
         
 	imu_data.psi = imu_data.psi - psi_init;
 
-	//printf("phi, theta, psi, phi_dot, theta_dot, psi_dot: %E, %E, %E, %E, %E, %E \n", imu_data.phi, imu_data.theta, imu_data.psi, imu_data.phi_dot, imu_data.theta_dot, imu_data.psi_dot);
 	tcflush(usb_imu, TCIFLUSH);
         
     //calculate error between desired and measured
     Sstate error = state_error(imu_data, phi_d, theta_d);
         
     //calculate thrust and desired acceleration
-    U = thrust(error,U_trim, gains);
+    Scontrol_command U = thrust(error,U_trim, gains);
 
     	 //printf("Moment: %E %E %E\n",M[0],M[1],M[2]);
-   	 //Calculating the forces of each motor
-    
-    ff = forces(forces(U,Ct,d);
+   	 //Calculating the forces of each motor and change force on motor objects
+    set_forces(U,Ct,d);
 
                 //WORKED UP TO HERE
    	int i;
@@ -253,35 +226,19 @@ void *control_stabilizer(void *thread_id)
 //   	double b[4]={1.4400,    1.4400,    1.4400,    1.4400};
 //   	double c[4]={0.0000,    0.0000,    0.0000,    0.0000};
 	
-	// controls motors
-	for(i=0;i<4;i++)
-		{
-		if(ff[i] < 0.0) ff[i] = 0.0;
-
-		if(CONTROLLER_RUN == true)
-    		{
-			//motor_out[i]=ceil((-b[i]+sqrt(b[i]*b[i]-4.*a[i]*(c[i]-ff[i])))/2./a[i]*240.);
-			motor_out[i] = ff[i];
-		}
-		else
-			motor_out[i] = 0.0;
-
-		if(motor_out[i] > 2047.0)   motor_out[i]=2047.0;
-		else if(motor_out[i] < 0.0)	 motor_out[i]=0.0;
-		}
         
-
+//NOT SURE WHAT IS GOING ON IN THIS LOOP!!!!
 //(uint8_t)(tmpVal >> 3) & 0xff
 	for(i=0;i<4;i++)
 	{
     //tell computer that we will use the file descriptor as and I2C comm line: assign address to fd
 	 ioctl(i2cHandle,I2C_SLAVE,address[i]);
 	 //motorspeed = (int)motor_out[i] / 8;
-	 motorspeed[0] = (uint8_t)(motor_out[i] >> 3) & 0xff;
+	motorspeed[0] = (uint8_t)(motor_out[i] >> 3) & 0xff;
 	// motorspeed_lowerbits = (((int)motor_out[i] % 8) & 0x07);
 	motorspeed[1] = (((uint8_t)motor_out[i] % 8) & 0x07);
 
-	 res_mtr_out = write(i2cHandle, &motorspeed, 1);
+	res_mtr_out = write(i2cHandle, &motorspeed, 1);
 
 	 //res_mtr_out = write(i2cHandle, &motorspeed_lowerbits,1);
 
@@ -327,17 +284,27 @@ void *buffer_thread(void *thread_id)
     pthread_exit(NULL);
 }
 
-void start_motor(int motor_out[], char motor){
+void start_motors(void){
 //this is for testing to see which motor is which
     //loop through motor_out and set its speed to 30 out of 255
     
-    cout << "Motor " << motor << " is running..." << endl;
+    cout << "Starting Motors ..." << endl;
 
-    for(int i = 0; i < 4; i++){
-        if(i != motor){ motor_out[i] = 0;}
-        else{ motor_out[i] = 30;}
-    }
+    motor_1.set_force(30.0);
+    motor_2.set_force(30.0);
+    motor_3.set_force(30.0);
+    motor_4.set_force(30.0);
+}
+void stop_motors(void){
+//this is for testing to see which motor is which
+    //loop through motor_out and set its speed to 30 out of 255
+    
+    cout << "Stopping Motors ..." << endl;
 
+    motor_1.shut_down();
+    motor_2.shut_down();
+    motor_3.shut_down();
+    motor_4.shut_down();
 }
 
 void controller_on_off(bool CONTROLLER_RUN){
@@ -360,7 +327,30 @@ void display_on_off(bool DISPLAY_RUN){
         DISPLAY_RUN = false;
     }
 }
-Sstate state_error(SImu_data, float phi_d, float theta_d){
+void set_Utrim(Scontrol_command& U_trim){
+    U_trim.thrust    = 0.0;
+    U_trim.roll_acc  = 0.0;
+    U_trim.pitch_acc = 0.0;
+    U_trim.yaw_Acc   = 0.0;
+}
+void set_gains(Sstate& gains){
+    gains.kp_theta = 5.5;
+    gains.kd_theta = 0.32;
+    
+    gains.kp_phi = 5.5;
+    gains.kd_phi = 0.32;
+    
+    gains.kp_psi = 5.2;
+    gains.kd_psi = 0.3;
+    
+}
+void set_desired_angles(Sdesired& desired_angles){
+    desired_angles.theta = 0.0;
+    desired_angles.phi = 0.0;
+    desired_angles.psi = 0.0;
+}
+
+Sstate state_error(const Sstate& imu_date, const float phi_d, const float theta_d){
     //calculate error in RADIANS
     //  xxx_d is xxx_desired.  imu outputs  degrees, we convert to radians with factor PI/180
     Sstate error;
@@ -372,26 +362,33 @@ Sstate state_error(SImu_data, float phi_d, float theta_d){
     error.psi_dot = (-imu_data.psi_dot) * PI/180;
     return error;
 }
-int[] thrust(Sstate error, int U_trim[], Sgains gains ){
+Scontrol_command thrust(const Sstate& error, const int U_trim[], const Sgains& gains){
     //calculate thrust and acceleration
     //U[0] thrust, U[1:3]: roll acc, pitch acc, yaw acc
-    int U[4];
-    U[0] = 30 + U_trim[0];
-    U[1] = gains.kp_phi * error.phi + gains.kd_phi * error.phi_dot + U_trim[1];
-    U[2] = gains.kp_theta * error.theta + gains.kd_theta * error.theta_dot + U_trim[2];
-    U[3] = gains.kp_psi * error.psi + gains.kd_psi * error.psi_dot + U_trim[3];
+    Scontrol_command U;
+    U.thrust = 30 + U_trim[0];
+    U.roll_acc  = gains.kp_phi   * error.phi   + gains.kd_phi   * error.phi_dot   + U_trim[1];
+    U.pitch_acc = gains.kp_theta * error.theta + gains.kd_theta * error.theta_dot + U_trim[2];
+    U.yaw_acc   = gains.kp_psi   * error.psi   + gains.kd_psi   * error.psi_dot   + U_trim[3];
     return U;
 }
-int[] forces(int U[], double Ct, double d ){
+void set_forces(const Scontrol_command& U, double Ct, double d){
     //calculate forces from thrusts and accelerations
-    //U[0] thrust, U[1:3]: roll acc, pitch acc, yaw acc
-    int U[4];
-    //WE ARE MULTIPLYING AN INTEGER AND A FLOAT ==> GETS PROMOTED TO FLOAT, MAYBE MAKE ff A FLOAT ARRAY< THEN CAST TO INT??
-    ff[0] = (U[0]/4-(U[3]/(4*Ct))+(U[2]/(2*d)));
-   	ff[1] = (U[0]/4+(U[3]/(4*Ct))-(U[1]/(2*d)));
-   	ff[2] = (U[0]/4-(U[3]/(4*Ct))-(U[2]/(2*d)));
-   	ff[3] = (U[0]/4+(U[3]/(4*Ct))+(U[1]/(2*d)));
-    return ff;
+    
+      double force_1 = (U.thrust/4 - (U.yaw_acc  /(4*Ct))+(U.pitch_acc / (2*d)));
+      //     ff[0]   = (U[0]    /4 - (U[3]      /(4*Ct))+(U[2]        / (2*d)));
+      double force_2 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
+      //     ff[1]   = (U[0]    /4 + (U[3]      /(4*Ct))-(U[1]        / (2*d)));
+      double force_3 = (U.thrust/4 - (U.yaw_acc /(4*Ct))-(U.pitch_acc /  (2*d)));
+      //     ff[2]   = (U[0]    /4 - (U[3]      /(4*Ct))-(U[2]        / (2*d)));
+      double force_4 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
+      //     ff[3]   = (U[0]    /4 + (U[3]      /(4*Ct))+(U[1]        / (2*d)));
+
+      motor_1.set_force( force_1 );
+      motor_2.set_force( force_2 ) ;
+      motor_3.set_force( force_3 );
+      motor_4.set_force( force_4 );
+
 
 }
 int main(void)
