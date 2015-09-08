@@ -5,18 +5,23 @@
 class motor
 {
    private:
-      double ensure_valid_force(double force_in);
+      int ensure_valid_force(int force_in);
       int motor_id;
-      double force;
-      double max_force = 2047.0;
-      double min_force = 0.0;
+      int i2c_address;
+      uint8_t force; //8 bit int
+      uint8_t max_force = 255;
+      uint8_t min_force = 0;
 
    public:
-   	  motor(int which_motor);  // This is the constructor
-      void set_force( double force_in );
+   	motor(int which_motor);  // This is the constructor
+      void set_force( int force_in );
       double get_force( void );
       void shut_down(void);
       int which_motor(void);
+      int send_force_i2c(void);
+      static int i2c_handle; // static variable
+      static int get_i2c(void);
+
  
 };
  

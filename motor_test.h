@@ -28,10 +28,6 @@
  typedef struct control_command {
  double thrust, roll_acc, pitch_acc, yaw_acc;
  } Scontrol_command;
- 
- typedef struct forces {
- double motor_1, motor_2, motor_3, motor_4;
- } Sforces;
 
 
 //function prototypes
@@ -47,7 +43,9 @@ void set_gains(Sstate& gains);
 void set_desired_angles(Sdesired& desired_angles);
 Sstate state_error(const Sstate& imu_date, const float phi_d, const float theta_d);
 Scontrol_command thrust(const Sstate& error, const int U_trim[], const Sgains& gains);
-Sforces forces(const Scontrol_command& U, double Ct, double d);
+void set_forces(const Scontrol_command& U, double Ct, double d);
+void send_forces(void);
+void display_info(const Sstate& error);
 
 
 #endif

@@ -8,18 +8,18 @@ pthread_cond_t data_acq_cv;
 
 struct timeval t_init, t_now, t_now_v;
 double t_v, del_t_v, t_prev_v = 0.0;
+
 volatile bool SYSTEM_RUN = true;
 volatile bool CONTROLLER_RUN = false;
 volatile bool DISPLAY_RUN = true;
 
- int i2cHandle, usb_imu, usb_xbee, res1;
- int motor_out[4] = {30, 30, 30, 30};
- int F_init = 30;
+int i2cHandle, usb_imu, usb_xbee, res1;
 
-float psi_init;
 double Ct=0.013257116418667*10;
 double d=0.169;
 
+//The address of i2c
+int address[4] = {0x2c, 0x29, 0x2b, 0x2a};
 
 Sdesired desired_angles;
 set_desired_angles(desired_angles);
@@ -31,15 +31,14 @@ Scontrol_command U_trim;
 set_Utrim(U_trim);
 
 //create our motor objects
-motor motor_1 = new motor(1);
-motor motor_2 = new motor(2);
-motor motor_3 = new motor(3);
-motor motor_4 = new motor(4);
+motor motor_1 = new motor(1, address[1]);
+motor motor_2 = new motor(2, address[2]);
+motor motor_3 = new motor(3, address[3]);
+motor motor_4 = new motor(4, address[4]);
 
 
 //executes input from host computer on motors, controller gains, displays, and controller
-void *command_input(void *thread_id)
-{
+void *command_input(void *thread_id){
  //command from the host computer
  unsigned char buf[2];
     
@@ -173,120 +172,56 @@ void *command_input(void *thread_id)
     }
     pthread_exit(NULL);
 }
-
-
-void *control_stabilizer(void *thread_id)
-{
-
- int i;
+void *control_stabilizer(void *thread_id){
  int address[4] = {0x2c, 0x29, 0x2b, 0x2a}; //The address of i2c
  //motorspeed : speed of motor on a scale from [0, 255] --> [stop, full speed]
- //res_mtr_out : confirmation of writing to motor
- int res_mtr_out, motorspeed_lowerbits;
- uint8_t motorspeed[2] = { 0 };
  unsigned char sensor_bytes2[24];
  int start_motor = 0x10; //16
     
-    while(SYSTEM_RUN == true) {
-        
-	Sstate imu_data;
-	tcflush(usb_imu, TCIFLUSH);
-	res1 = read(usb_imu,&sensor_bytes2[0],24);
-        
-    //function in imu.h that distributes imu_data to each field
-    unpack_data(imu_data, sensor_bytes2);
- 
-	if(CONTROLLER_RUN == false)
-    {   //if controller is not running
-            //get initial value for psi from imu, set motorspeed to 0, check result of motorspeed assignment (~1/-1)
-        psi_init  =  imu_data.psi;
-        motorspeed[0] = 0 ;
-        res_mtr_out = write(i2cHandle, &motorspeed,1);
-    }
-        
-	imu_data.psi = imu_data.psi - psi_init;
+ Sstate imu_data; 
 
-	tcflush(usb_imu, TCIFLUSH);
-        
-    //calculate error between desired and measured
-    Sstate error = state_error(imu_data, phi_d, theta_d);
-        
-    //calculate thrust and desired acceleration
-    Scontrol_command U = thrust(error,U_trim, gains);
-
-    	 //printf("Moment: %E %E %E\n",M[0],M[1],M[2]);
-   	 //Calculating the forces of each motor and change force on motor objects
-    set_forces(U,Ct,d);
-
-                //WORKED UP TO HERE
-   	int i;
-
-    // motor calibration - not needed
-//   	double a[4]={3.0107,    3.0107,    3.0107,    3.0107};
-//   	double b[4]={1.4400,    1.4400,    1.4400,    1.4400};
-//   	double c[4]={0.0000,    0.0000,    0.0000,    0.0000};
-	
-        
-//NOT SURE WHAT IS GOING ON IN THIS LOOP!!!!
-//(uint8_t)(tmpVal >> 3) & 0xff
-	for(i=0;i<4;i++)
-	{
-    //tell computer that we will use the file descriptor as and I2C comm line: assign address to fd
-	 ioctl(i2cHandle,I2C_SLAVE,address[i]);
-	 //motorspeed = (int)motor_out[i] / 8;
-	motorspeed[0] = (uint8_t)(motor_out[i] >> 3) & 0xff;
-	// motorspeed_lowerbits = (((int)motor_out[i] % 8) & 0x07);
-	motorspeed[1] = (((uint8_t)motor_out[i] % 8) & 0x07);
-
-	res_mtr_out = write(i2cHandle, &motorspeed, 1);
-
-	 //res_mtr_out = write(i2cHandle, &motorspeed_lowerbits,1);
-
-	 printf("motor out: %d, %d\n", motorspeed[0], motorspeed[1]);
-	}
-
-	if(DISPLAY_RUN == true)
-	{
-/*		printf("<==========================================>\n");
-		if(CONTROLLER_RUN == true) printf("Controller ON \n");
-		else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
-		printf("	IMU DATA	\n");
-		printf("phi: %.2f         phi dot: %.2f\n",imu_data.phi, imu_data.phi_dot);
-		printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
-		printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
-
-		printf("	GAINS		\n");
-		printf("kp_phi: %f	kd_phi: %f\n",kp_phi, kd_phi);
-		printf("kp_theta: %f	kd_theta: %f\n",kp_theta, kd_theta);
-		printf("kp_psi: %f	kd_psi: %f\n\n\n",kp_psi, kd_psi);
-
-		printf("	MOTOR_OUT	\n");
-		printf("Motor #1: %d,      raw: %d\n", motor_out[0], ff[0]);
-		printf("Motor #2: %d,      raw: %d\n", motor_out[1], ff[1]);		
-		printf("Motor #3: %d,      raw: %d\n", motor_out[2], ff[2]);
-		printf("Motor #4: %d,      raw: %d\n\n\n", motor_out[3], ff[3]);
-		
-		printf("	Errors		\n");
-		printf("e_phi: %f,	e_theta: %f,	e_psi: %f\n\n\n", e_phi*180/PI, e_theta*180/PI, e_psi*180/PI); */
-		printf("Motor out: %d\n", motor_out[0]);
-	}
-
-    }
-    pthread_exit(NULL);
-}
-
-void *buffer_thread(void *thread_id)
-{
-    
     while(SYSTEM_RUN == true) {
 
+        if(CONTROLLER_RUN == false) {   stop_motors();  }
+
+	    tcflush(usb_imu, TCIFLUSH);
+
+	    res1 = read(usb_imu,&sensor_bytes2[0],24);
+        
+        //distributes data from imu stored in buffer sensor_bytes2 to 
+            //each field in imu_data
+        unpack_data(imu_data, sensor_bytes2);
+
+	    tcflush(usb_imu, TCIFLUSH);
+        
+        //calculate error between desired and measured state
+        Sstate error = state_error(imu_data, phi_d, theta_d);
+        
+        //calculate thrust and desired acceleration
+        Scontrol_command U = thrust(error,U_trim, gains);
+
+   	    //calculate the forces of each motor and change force on motor objects
+        set_forces(U,Ct,d);
+
+        //send forces to motor via I2C
+        send_forces();
+
+	    if(DISPLAY_RUN == true) { display_info(error); }
+
     }
+
     pthread_exit(NULL);
 }
+void *buffer_thread(void *thread_id){
+    cout << "called buffer_thread: no content yet" << endl;
+    // while(SYSTEM_RUN == true) {
 
+    // }
+    pthread_exit(NULL);
+}
 void start_motors(void){
 //this is for testing to see which motor is which
-    //loop through motor_out and set its speed to 30 out of 255
+    //set speed to 30 out of 255
     
     cout << "Starting Motors ..." << endl;
 
@@ -296,9 +231,7 @@ void start_motors(void){
     motor_4.set_force(30.0);
 }
 void stop_motors(void){
-//this is for testing to see which motor is which
-    //loop through motor_out and set its speed to 30 out of 255
-    
+ 
     cout << "Stopping Motors ..." << endl;
 
     motor_1.shut_down();
@@ -306,7 +239,6 @@ void stop_motors(void){
     motor_3.shut_down();
     motor_4.shut_down();
 }
-
 void controller_on_off(bool CONTROLLER_RUN){
     if(CONTROLLER_RUN == false){
         printf("Controller ON!!\n");
@@ -341,15 +273,13 @@ void set_gains(Sstate& gains){
     gains.kd_phi = 0.32;
     
     gains.kp_psi = 5.2;
-    gains.kd_psi = 0.3;
-    
+    gains.kd_psi = 0.3;  
 }
 void set_desired_angles(Sdesired& desired_angles){
     desired_angles.theta = 0.0;
     desired_angles.phi = 0.0;
     desired_angles.psi = 0.0;
 }
-
 Sstate state_error(const Sstate& imu_date, const float phi_d, const float theta_d){
     //calculate error in RADIANS
     //  xxx_d is xxx_desired.  imu outputs  degrees, we convert to radians with factor PI/180
@@ -384,15 +314,46 @@ void set_forces(const Scontrol_command& U, double Ct, double d){
       double force_4 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
       //     ff[3]   = (U[0]    /4 + (U[3]      /(4*Ct))+(U[1]        / (2*d)));
 
-      motor_1.set_force( force_1 );
-      motor_2.set_force( force_2 ) ;
-      motor_3.set_force( force_3 );
-      motor_4.set_force( force_4 );
 
-
+      motor_1.set_force( round(force_1) );
+      motor_2.set_force( round(force_2) );
+      motor_3.set_force( round(force_3) );
+      motor_4.set_force( round(force_4) );
 }
-int main(void)
-{
+void send_forces(void){
+    //send forces to all motors via I2C
+    motor_1.send_force_i2c();
+    motor_2.send_force_i2c();
+    motor_3.send_force_i2c();
+    motor_4.send_force_i2c();
+}
+void display_info(const Sstate& error){
+        printf("<==========================================>\n");
+        if(CONTROLLER_RUN == true) printf("Controller ON \n");
+        else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
+        printf("    IMU DATA    \n");
+        printf("phi: %.2f         phi dot: %.2f\n",imu_data.phi, imu_data.phi_dot);
+        printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
+        printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
+
+        printf("    GAINS       \n");
+        printf("kp_phi: %f  kd_phi: %f\n",gains.kp_phi, gains.kd_phi);
+        printf("kp_theta: %f    kd_theta: %f\n",gains.kp_theta, gains.kd_theta);
+        printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
+
+        printf("    MOTOR_OUT   \n");
+        printf("Motor #1: %d,      raw: %d\n",     motor_1.get_force());
+        printf("Motor #2: %d,      raw: %d\n",     motor_2.get_force());        
+        printf("Motor #3: %d,      raw: %d\n",     motor_3.get_force());
+        printf("Motor #4: %d,      raw: %d\n\n\n", motor_4.get_force();
+        
+        printf("    Errors      \n");
+        printf("e_phi: %f,  e_theta: %f,    e_psi: %f\n\n\n",error.phi, error.theta, error.psi);
+        //printf("Motor out: %d\n", motor_out[0]);
+}
+
+
+int main(void){
  //pthread_t - is an abstract datatype that is used as a handle to reference the thread
  pthread_t threads[3];
  //Special Attribute for starting thread (?)
@@ -403,14 +364,7 @@ int main(void)
 
  system("clear");
  gettimeofday(&t_init,NULL);
-   
- printf("opening i2c port...\n");
- i2cHandle = open("/dev/i2c-4",O_RDWR);
-
-	if (i2cHandle > 0)
-		printf("Done!\n");
-	else
-		printf("Fail to open i2c port!\n");
+ 
  usleep(10000);
 
  printf("Opening an USB port...   ");//Opens the usb Port
@@ -461,14 +415,12 @@ int main(void)
         pthread_join(threads[i], NULL);
     }
     
-    close(i2cHandle);
+    close(motor::get_i2c());
     close(usb_xbee);
     close(usb_imu);
     
     pthread_attr_destroy(&attr);
     pthread_mutex_destroy(&data_acq_mutex);
     return 0;
-    
-
 }
 
