@@ -1,7 +1,4 @@
-#include "imu.h"
 #include "motor_test.h"
-#include "motor.h"
-
 
 pthread_mutex_t data_acq_mutex; 
 pthread_cond_t data_acq_cv;
@@ -21,20 +18,25 @@ double d=0.169;
 //The address of i2c
 int address[4] = {0x2c, 0x29, 0x2b, 0x2a};
 
-Sdesired desired_angles;
-set_desired_angles(desired_angles);
+//finding motor addresses:
+    //different pad combinations make 4 different addresses
+    //download i2c library - i2c-tools : sudo apt_get ... i2c-tools
+    //check for i2c addresses: sudo i2cdetect -y -l
+            // prints out i2c ports on odroid - need find which pin corresponds to which output i2c
+             
 
-Sstate gains;
-set_gains(gains);
+// IT SEEMS YOU CANNOT CALL FUNCTIONS IN THE PREPROCESSOR AREA???
+Desired_angles desired_angles;
 
-Scontrol_command U_trim;
-set_Utrim(U_trim);
+Gains gains;
+
+Control_command U_trim;
 
 //create our motor objects
-motor motor_1 = new motor(1, address[1]);
-motor motor_2 = new motor(2, address[2]);
-motor motor_3 = new motor(3, address[3]);
-motor motor_4 = new motor(4, address[4]);
+motor motor_1 = new motor(1, address[0]);
+motor motor_2 = new motor(2, address[1]);
+motor motor_3 = new motor(3, address[2]);
+motor motor_4 = new motor(4, address[3]);
 
 
 //executes input from host computer on motors, controller gains, displays, and controller
@@ -102,13 +104,13 @@ void *command_input(void *thread_id){
             case 'r':
             case 'R':
                 printf("Increase Thrust\n");
-                U_trim[0] = U_trim[0] + 4;
+                U_trim.thrust = U_trim.thrust + 4;
                 break;
                 
             case 'f':
             case 'F':
                 printf("Decrease Thrust!\n");
-                U_trim[0] = U_trim[0] - 4;
+                U_trim.thrust = U_trim.thrust - 4;
                 break;
                 
             case 'w':
@@ -142,25 +144,25 @@ void *command_input(void *thread_id){
             case 'k':
             case 'K':
                 printf("Increase theta_d ('theta desired') \n");
-                gains.theta_d = gains.theta_d + 1.0;
+                desired_angles.theta = desired_angles.theta + 1.0;
                 break;
                 
             case 'i':
             case 'I':
                 printf("Decrease theta_d ('theta desired') \n");
-                gains.theta_d = gains.theta_d - 1.0;
+                desired_angles.theta = desired_angles.theta - 1.0;
                 break;
                 
             case 'l':
             case 'L':
                 printf("Increase phi_d ('phi desired') \n");
-                gains.phi_d = gains.phi_d + 1.0;
+                desired_angles.phi = desired_angles.phi + 1.0;
                 break;
                 
             case 'j':
             case 'J':
                 printf("Decrease phi_d ('phi desired') \n");
-                gains.phi_d = gains.phi_d - 1.0;
+                desired_angles.phi = desired_angles.phi - 1.0;
                 break;
                 
             default:
@@ -173,12 +175,11 @@ void *command_input(void *thread_id){
     pthread_exit(NULL);
 }
 void *control_stabilizer(void *thread_id){
- int address[4] = {0x2c, 0x29, 0x2b, 0x2a}; //The address of i2c
- //motorspeed : speed of motor on a scale from [0, 255] --> [stop, full speed]
+ 
  unsigned char sensor_bytes2[24];
  int start_motor = 0x10; //16
     
- Sstate imu_data; 
+ State imu_data; 
 
     while(SYSTEM_RUN == true) {
 
@@ -195,10 +196,10 @@ void *control_stabilizer(void *thread_id){
 	    tcflush(usb_imu, TCIFLUSH);
         
         //calculate error between desired and measured state
-        Sstate error = state_error(imu_data, phi_d, theta_d);
+        State error = state_error(imu_data, desired_angles.phi, desired_angles.theta);
         
         //calculate thrust and desired acceleration
-        Scontrol_command U = thrust(error,U_trim, gains);
+        Control_command U = thrust(error,U_trim, gains);
 
    	    //calculate the forces of each motor and change force on motor objects
         set_forces(U,Ct,d);
@@ -206,7 +207,7 @@ void *control_stabilizer(void *thread_id){
         //send forces to motor via I2C
         send_forces();
 
-	    if(DISPLAY_RUN == true) { display_info(error); }
+	    if(DISPLAY_RUN == true) { display_info(imu_data, error); }
 
     }
 
@@ -218,6 +219,11 @@ void *buffer_thread(void *thread_id){
 
     // }
     pthread_exit(NULL);
+}
+void init(void){
+    set_desired_angles(desired_angles);
+    set_gains(gains);
+    set_Utrim(U_trim);
 }
 void start_motors(void){
 //this is for testing to see which motor is which
@@ -259,13 +265,13 @@ void display_on_off(bool DISPLAY_RUN){
         DISPLAY_RUN = false;
     }
 }
-void set_Utrim(Scontrol_command& U_trim){
+void set_Utrim(Control_command& U_trim){
     U_trim.thrust    = 0.0;
     U_trim.roll_acc  = 0.0;
     U_trim.pitch_acc = 0.0;
-    U_trim.yaw_Acc   = 0.0;
+    U_trim.yaw_acc   = 0.0;
 }
-void set_gains(Sstate& gains){
+void set_gains(Gains& gains){
     gains.kp_theta = 5.5;
     gains.kd_theta = 0.32;
     
@@ -275,34 +281,34 @@ void set_gains(Sstate& gains){
     gains.kp_psi = 5.2;
     gains.kd_psi = 0.3;  
 }
-void set_desired_angles(Sdesired& desired_angles){
+void set_desired_angles(Desired_angles& desired_angles){
     desired_angles.theta = 0.0;
-    desired_angles.phi = 0.0;
-    desired_angles.psi = 0.0;
+    desired_angles.phi   = 0.0;
+    desired_angles.psi   = 0.0;
 }
-Sstate state_error(const Sstate& imu_date, const float phi_d, const float theta_d){
+state state_error(const State& imu_data, const Desired_angles& desired_angles){
     //calculate error in RADIANS
     //  xxx_d is xxx_desired.  imu outputs  degrees, we convert to radians with factor PI/180
-    Sstate error;
-    error.phi = (-imu_data.phi + phi_d) * PI/180;
-    error.theta = (-imu_data.theta + theta_d) * PI/180;
-    error.psi = (-imu_data.psi + psi_d) * PI/180;
-    error.phi_dot = (-imu_data.phi_dot) * PI/180;
-    error.theta_dot = (-imu_data.theta_dot) * PI/180;
-    error.psi_dot = (-imu_data.psi_dot) * PI/180;
+    State error;
+    error.phi       =     (-imu_data.phi    +   desired_angles.phi) * PI/180;
+    error.theta     =     (-imu_data.theta  + desired_angles.theta) * PI/180;
+    error.psi       =     (-imu_data.psi    +   desired_angles.psi) * PI/180;
+    error.phi_dot   =                           (-imu_data.phi_dot) * PI/180;
+    error.theta_dot =                         (-imu_data.theta_dot) * PI/180;
+    error.psi_dot   =                           (-imu_data.psi_dot) * PI/180;
     return error;
 }
-Scontrol_command thrust(const Sstate& error, const int U_trim[], const Sgains& gains){
+Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains){
     //calculate thrust and acceleration
     //U[0] thrust, U[1:3]: roll acc, pitch acc, yaw acc
-    Scontrol_command U;
-    U.thrust = 30 + U_trim[0];
-    U.roll_acc  = gains.kp_phi   * error.phi   + gains.kd_phi   * error.phi_dot   + U_trim[1];
-    U.pitch_acc = gains.kp_theta * error.theta + gains.kd_theta * error.theta_dot + U_trim[2];
-    U.yaw_acc   = gains.kp_psi   * error.psi   + gains.kd_psi   * error.psi_dot   + U_trim[3];
+    Control_command U;
+    U.thrust = 30 + U_trim.roll_acc;
+    U.roll_acc  = gains.kp_phi   * error.phi   + gains.kd_phi   * error.phi_dot   + U_trim.roll_acc;
+    U.pitch_acc = gains.kp_theta * error.theta + gains.kd_theta * error.theta_dot + U_trim.pitch_acc;
+    U.yaw_acc   = gains.kp_psi   * error.psi   + gains.kd_psi   * error.psi_dot   + U_trim.yaw_acc;
     return U;
 }
-void set_forces(const Scontrol_command& U, double Ct, double d){
+void set_forces(const Control_command& U, double Ct, double d){
     //calculate forces from thrusts and accelerations
     
       double force_1 = (U.thrust/4 - (U.yaw_acc  /(4*Ct))+(U.pitch_acc / (2*d)));
@@ -327,12 +333,12 @@ void send_forces(void){
     motor_3.send_force_i2c();
     motor_4.send_force_i2c();
 }
-void display_info(const Sstate& error){
+void display_info(const State& imu_data, const State& error){
         printf("<==========================================>\n");
         if(CONTROLLER_RUN == true) printf("Controller ON \n");
         else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
         printf("    IMU DATA    \n");
-        printf("phi: %.2f         phi dot: %.2f\n",imu_data.phi, imu_data.phi_dot);
+        printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
 
@@ -342,10 +348,10 @@ void display_info(const Sstate& error){
         printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
 
         printf("    MOTOR_OUT   \n");
-        printf("Motor #1: %d,      raw: %d\n",     motor_1.get_force());
-        printf("Motor #2: %d,      raw: %d\n",     motor_2.get_force());        
-        printf("Motor #3: %d,      raw: %d\n",     motor_3.get_force());
-        printf("Motor #4: %d,      raw: %d\n\n\n", motor_4.get_force();
+        printf("Motor #1: %f\n",     motor_1.get_force());
+        printf("Motor #2: %f\n",     motor_2.get_force());        
+        printf("Motor #3: %f\n",     motor_3.get_force());
+        printf("Motor #4: %f\n\n\n", motor_4.get_force());
         
         printf("    Errors      \n");
         printf("e_phi: %f,  e_theta: %f,    e_psi: %f\n\n\n",error.phi, error.theta, error.psi);
@@ -354,73 +360,75 @@ void display_info(const Sstate& error){
 
 
 int main(void){
- //pthread_t - is an abstract datatype that is used as a handle to reference the thread
- pthread_t threads[3];
- //Special Attribute for starting thread (?)
- pthread_attr_t attr;
- //sched_param is a structure that maintains the scheduleing paramterts
- struct sched_param	param;
- int fifo_max_prio, fifo_min_prio;
+    cout <<"in main" << endl;
+    init();
+ // //pthread_t - is an abstract datatype that is used as a handle to reference the thread
+ // pthread_t threads[3];
+ // //Special Attribute for starting thread (?)
+ // pthread_attr_t attr;
+ // //sched_param is a structure that maintains the scheduleing paramterts
+ // struct sched_param	param;
+ // int fifo_max_prio, fifo_min_prio;
 
- system("clear");
- gettimeofday(&t_init,NULL);
+ // system("clear");
+ // gettimeofday(&t_init,NULL);
  
- usleep(10000);
+ // usleep(10000);
 
- printf("Opening an USB port...   ");//Opens the usb Port
- usb_xbee = open_usbport();
-	if (usb_xbee <0)
-        	printf("\n Error opening an USB0 port!!\n");
-        else
-        	printf("Done!\n");
- usleep(10000);
+ // printf("Opening an USB port...   ");//Opens the usb Port
+ // usb_xbee = open_usbport();
+	// if (usb_xbee <0)
+ //        	printf("\n Error opening an USB0 port!!\n");
+ //        else
+ //        	printf("Done!\n");
+ // usleep(10000);
 
- printf("opening usb port for imu...\n");
- usb_imu = open_port();
-	if (usb_imu > 0)
-		printf("Done!\n");
-	else
-		printf("Fail to open usb port!\n");
- usleep(100000);
+ // printf("opening usb port for imu...\n");
+ // usb_imu = open_port();
+	// if (usb_imu > 0)
+	// 	printf("Done!\n");
+	// else
+	// 	printf("Fail to open usb port!\n");
+ // usleep(100000);
 
-  // Initialize mutex and condition variables
-    pthread_mutex_init(&data_acq_mutex, NULL);
+ //  // Initialize mutex and condition variables
+ //    pthread_mutex_init(&data_acq_mutex, NULL);
     
-    // Set thread attributes
-    pthread_attr_init(&attr);
-    pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    fifo_max_prio = sched_get_priority_max(SCHED_FIFO);
-    fifo_min_prio = sched_get_priority_min(SCHED_FIFO);
+ //    // Set thread attributes
+ //    pthread_attr_init(&attr);
+ //    pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+ //    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+ //    fifo_max_prio = sched_get_priority_max(SCHED_FIFO);
+ //    fifo_min_prio = sched_get_priority_min(SCHED_FIFO);
     
-    // Create threads
-    // Higher priority for filter
-    param.sched_priority = fifo_max_prio;
-    pthread_attr_setschedparam(&attr, &param);
-    pthread_create(&threads[0], &attr, control_stabilizer, (void *) 0);
+ //    // Create threads
+ //    // Higher priority for filter
+ //    param.sched_priority = fifo_max_prio;
+ //    pthread_attr_setschedparam(&attr, &param);
+ //    pthread_create(&threads[0], &attr, control_stabilizer, (void *) 0);
     
-    // Medium priority for vicon
-    param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
-    pthread_attr_setschedparam(&attr, &param);
-    pthread_create(&threads[1], &attr, buffer_thread, (void *) 1);
+ //    // Medium priority for vicon
+ //    param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
+ //    pthread_attr_setschedparam(&attr, &param);
+ //    pthread_create(&threads[1], &attr, buffer_thread, (void *) 1);
     
-    // Lower priority for vicon
-    param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
-    pthread_attr_setschedparam(&attr, &param);
-    pthread_create(&threads[2], &attr, command_input, (void *) 2);
+ //    // Lower priority for vicon
+ //    param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
+ //    pthread_attr_setschedparam(&attr, &param);
+ //    pthread_create(&threads[2], &attr, command_input, (void *) 2);
     
-    // Wait for all threads to complete
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        pthread_join(threads[i], NULL);
-    }
+ //    // Wait for all threads to complete
+ //    for (int i = 0; i < NUM_THREADS; i++)
+ //    {
+ //        pthread_join(threads[i], NULL);
+ //    }
     
-    close(motor::get_i2c());
-    close(usb_xbee);
-    close(usb_imu);
+ //    close(motor::get_i2c());
+ //    close(usb_xbee);
+ //    close(usb_imu);
     
-    pthread_attr_destroy(&attr);
-    pthread_mutex_destroy(&data_acq_mutex);
-    return 0;
+ //    pthread_attr_destroy(&attr);
+ //    pthread_mutex_destroy(&data_acq_mutex);
+ //    return 0;
 }
 

@@ -5,7 +5,6 @@
 //  Created by Max Wasserman on 9/7/15.
 //
 //
-
 #include "imu.h"
 
 int open_port()
@@ -59,7 +58,7 @@ int open_port()
     return port;
 }
 
-void print_data(const Sstate& imu_data)
+void print_data(const State& imu_data)
 {
     cout << "theta:      " << imu_data.theta;
     cout << "  phi:    " << imu_data.phi;
@@ -70,7 +69,7 @@ void print_data(const Sstate& imu_data)
     
 }
 
-void unpack_data(Sstate& imu_data, const unsigned char arr[]){
+void unpack_data(State& imu_data, const unsigned char arr[]){
     //distributes data from the input buffer to the imu_data data structure
     //we make a char[] to recieve imu data (imu outputs byte by byte)
     //the cast to a float pointer takes the first four bytes in the array 'arr',
@@ -87,7 +86,7 @@ void unpack_data(Sstate& imu_data, const unsigned char arr[]){
     
 }
 
-void get_data(const int port, Sstate& imu_data)
+void get_data(const int port, State& imu_data)
 {
     //cout << "entering get_data" << endl;
     
@@ -116,7 +115,7 @@ int main (void)
     /* File descriptor for the port */
     int port = open_port();
     //instantiate imu_data ==> scope is over while loop. Same imu_data will be overwritten repeatedly
-    Sstate imu_data;
+    State imu_data;
     while(1)
     {   //pull data from sensor and put into imu_data
         get_data(port, imu_data); //WAS SUTCK IN read
