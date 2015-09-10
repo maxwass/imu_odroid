@@ -1,0 +1,42 @@
+//=================================
+// include guard
+#ifndef MOTOR_H
+#define MOTOR_H
+
+//=================================
+// included dependencies
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <iostream>
+
+
+using namespace std;
+
+
+
+class motor
+{
+   private:
+      int ensure_valid_force(int force_in);
+      int motor_id;
+      int i2c_address;
+      uint8_t force; //8 bit int
+      const static uint8_t max_force = 255;
+      const static uint8_t min_force = 0;
+
+   public:
+   	motor(int motor_id, int i2c_address);  // This is the constructor
+      void set_force( int force_in );
+      uint8_t get_force( void );
+      void shut_down(void);
+      int which_motor(void);
+      void send_force_i2c(void);
+      static int i2c_handle; // static variable
+      static int get_i2c(void);
+
+ 
+};
+ 
+
+#endif
+// __MOTOR_H_INCLUDED__
