@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
-//#include "imu.h"
 #include "motor.h"   //#include because motor_test contains a motor object
 #include "imu.h"
 // #include "receiver.h"
@@ -59,7 +58,7 @@ void display_on_off(bool DISPLAY_RUN);
 void set_Utrim(Control_command& U_trim);
 void set_gains(Gains& gains);
 void set_desired_angles(Desired_angles& desired_angles);
-State state_error(const State& imu_date, const float phi_d, const float theta_d);
+State state_error(const State& imu_date, const double phi_d, const double theta_d);
 Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
 void send_forces(void);

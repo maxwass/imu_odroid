@@ -33,10 +33,10 @@ Gains gains;
 Control_command U_trim;
 
 //create our motor objects
-motor motor_1 = new motor(1, address[0]);
-motor motor_2 = new motor(2, address[1]);
-motor motor_3 = new motor(3, address[2]);
-motor motor_4 = new motor(4, address[3]);
+motor motor_1(1, address[0]);
+motor motor_2(2, address[1]);
+motor motor_3(3, address[2]);
+motor motor_4(4, address[3]);
 
 
 //executes input from host computer on motors, controller gains, displays, and controller
@@ -348,10 +348,10 @@ void display_info(const State& imu_data, const State& error){
         printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
 
         printf("    MOTOR_OUT   \n");
-        printf("Motor #1: %f\n",     motor_1.get_force());
-        printf("Motor #2: %f\n",     motor_2.get_force());        
-        printf("Motor #3: %f\n",     motor_3.get_force());
-        printf("Motor #4: %f\n\n\n", motor_4.get_force());
+        printf("Motor #1: %i\n",     motor_1.get_force());
+        printf("Motor #2: %i\n",     motor_2.get_force());        
+        printf("Motor #3: %i\n",     motor_3.get_force());
+        printf("Motor #4: %i\n\n\n", motor_4.get_force());
         
         printf("    Errors      \n");
         printf("e_phi: %f,  e_theta: %f,    e_psi: %f\n\n\n",error.phi, error.theta, error.psi);
