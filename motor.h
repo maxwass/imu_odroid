@@ -8,6 +8,10 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <iostream>
+#include <fcntl.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <unistd.h>
 
 
 using namespace std;
