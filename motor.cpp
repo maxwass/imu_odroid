@@ -3,9 +3,10 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #define MOTOR_PATH "/dev/i2c-4"
 
-int open_i2c(void){
+int motor::open_i2c(void){
     cout << "opening i2c port...";
     int handle = open(MOTOR_PATH,O_RDWR);
 
@@ -25,7 +26,7 @@ motor::motor(int motor_id, int i2c_address)
     
 }
  
-void motor::set_force( int force_in )
+void motor::set_force( int force_in , bool CONTROLLER_RUN)
 { //when setting force, check that ...
     //the motors are allowed to run (CONTROLLER_RUN flag is true)
     //the force is within acceptable bounds
@@ -61,7 +62,8 @@ void motor::send_force_i2c(void){
         //write() writes up to count bytes from the buffer 
         //pointed buf to the file referred to by the file 
         //descriptor fd.
-    int success_write = write(i2c_handle, &force, 1);
+        uint8_t fake = 10;
+    int success_write = write(i2c_handle, &fake, 1);
 
     if(success_write < 0) {
         cout << "Failed to write to motor" << motor_id << endl;

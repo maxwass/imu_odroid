@@ -37,7 +37,7 @@ int open_usbport()
        newtio.c_lflag = 0; // raw input
     
        //Time-Outs -- won't work with NDELAY option in the call to open
-       newtio.c_cc[VMIN]  = 2;   // block reading until RX x characers. If x = 0, it is non-blocking.
+       newtio.c_cc[VMIN]  = 0;   // block reading until RX x characers. If x = 0, it is non-blocking.
        newtio.c_cc[VTIME] = 0;   // Inter-Character Timer -- i.e. timeout= x*.1 s
     
        //Set local mode and enable the receiver

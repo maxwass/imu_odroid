@@ -49,16 +49,16 @@ void *command_input(void *thread_id){
     //discard data written to the object referred to by the file descriptor ("usb_xbee), TCIOFLUSH - flushes both
         //data received but not read, and data written but not transmitted.
 	tcflush(usb_xbee,TCIOFLUSH);
-        
+    //   
     //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf" which in this case is the command
         //from host computer
-	read(usb_xbee,buf,2);
+//	read(usb_xbee,buf,2);
 
-        if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
-        else{printf("Wrong start byte!\n");}
+ //       if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
+ //       else{printf("Wrong start byte!\n");}
     
     //Why are we flushing HERE???
-	tcflush(usb_xbee,TCIOFLUSH);
+//	tcflush(usb_xbee,TCIOFLUSH);
 
     //inputs map from buf[1] to controls: if buf[1] == ...
         //1-5       ==> motors ON/OFF
@@ -165,10 +165,10 @@ void *command_input(void *thread_id){
                 desired_angles.phi = desired_angles.phi - 1.0;
                 break;
                 
-            default:
-                printf("Command Input: Unrecognized input command");
-                cout << command << endl;
-                break;
+         //   default:
+         //       printf("Command Input: Unrecognized input command");
+         //       cout << command << endl;
+         //       break;
         }
 
     }
@@ -181,22 +181,30 @@ void *control_stabilizer(void *thread_id){
     
  State imu_data; 
 
-    while(SYSTEM_RUN == true) {
+    while(SYSTEM_RUN) {
 
         if(CONTROLLER_RUN == false) {   stop_motors();  }
 
 	    tcflush(usb_imu, TCIFLUSH);
+printf("1\n");
 
-	    res1 = read(usb_imu,&sensor_bytes2[0],24);
-        
+	 //   res1 = read(usb_imu,&sensor_bytes2[0],24);
+	 
+printf("2\n");        
         //distributes data from imu stored in buffer sensor_bytes2 to 
             //each field in imu_data
-        unpack_data(imu_data, sensor_bytes2);
+       // unpack_data(imu_data, sensor_bytes2);
+         imu_data.psi = 0.;
+    imu_data.theta = 0.;
+    imu_data.phi = 0.;
+    imu_data.phi_dot = 0.;
+    imu_data.theta_dot = 0.;
+    imu_data.psi_dot =  0.;
 
 	    tcflush(usb_imu, TCIFLUSH);
         
         //calculate error between desired and measured state
-        State error = state_error(imu_data, desired_angles.phi, desired_angles.theta);
+        State error = state_error(imu_data, desired_angles);
         
         //calculate thrust and desired acceleration
         Control_command U = thrust(error,U_trim, gains);
@@ -231,10 +239,10 @@ void start_motors(void){
     
     cout << "Starting Motors ..." << endl;
 
-    motor_1.set_force(30.0);
-    motor_2.set_force(30.0);
-    motor_3.set_force(30.0);
-    motor_4.set_force(30.0);
+    motor_1.set_force(30.0, CONTROLLER_RUN);
+    motor_2.set_force(30.0, CONTROLLER_RUN);
+    motor_3.set_force(30.0, CONTROLLER_RUN);
+    motor_4.set_force(30.0, CONTROLLER_RUN);
 }
 void stop_motors(void){
  
@@ -321,10 +329,10 @@ void set_forces(const Control_command& U, double Ct, double d){
       //     ff[3]   = (U[0]    /4 + (U[3]      /(4*Ct))+(U[1]        / (2*d)));
 
 
-      motor_1.set_force( round(force_1) );
-      motor_2.set_force( round(force_2) );
-      motor_3.set_force( round(force_3) );
-      motor_4.set_force( round(force_4) );
+      motor_1.set_force( round(force_1), CONTROLLER_RUN );
+      motor_2.set_force( round(force_2), CONTROLLER_RUN );
+      motor_3.set_force( round(force_3), CONTROLLER_RUN );
+      motor_4.set_force( round(force_4), CONTROLLER_RUN );
 }
 void send_forces(void){
     //send forces to all motors via I2C
@@ -423,7 +431,7 @@ int main(void){
          pthread_join(threads[i], NULL);
      }
     
-     close(motor::get_i2c());
+  //   close(motor::get_i2c());
      close(usb_xbee);
      close(usb_imu);
     
