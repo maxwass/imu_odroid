@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/daewon/workspace/imu_odroid/motor.cpp
+motor.h
+/home/daewon/workspace/imu_odroid/motor.h
+fcntl.h
+-
+linux/i2c.h
+-
+linux/i2c-dev.h
+-
+unistd.h
+-
+
+/home/daewon/workspace/imu_odroid/motor.h
+stdlib.h
+-
+sys/ioctl.h
+-
+iostream
+-
+

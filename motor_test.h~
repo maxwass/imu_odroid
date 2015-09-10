@@ -8,8 +8,8 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
+// #include <linux/i2c.h>
+// #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <string.h>
@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include "motor.h"   //#include because motor_test contains a motor object
 #include "imu.h"
-#include "receiver.h"
+// #include "receiver.h"
 
 //=================================
 // forward declared dependencies

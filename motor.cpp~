@@ -70,6 +70,6 @@ void motor::send_force_i2c(void){
 }
 
 
-//int get_i2c(void){
-//    return i2c_address;
-//}
+int get_i2c(void){
+    return i2c_address;
+}
