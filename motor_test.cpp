@@ -7,8 +7,8 @@ struct timeval t_init, t_now, t_now_v;
 double t_v, del_t_v, t_prev_v = 0.0;
 
 volatile bool SYSTEM_RUN = true;
-volatile bool CONTROLLER_RUN = false;
-volatile bool DISPLAY_RUN = true;
+volatile bool CONTROLLER_RUN = true;
+volatile bool DISPLAY_RUN = false;
 
 int i2cHandle, usb_imu, usb_xbee, res1;
 
@@ -52,13 +52,14 @@ void *command_input(void *thread_id){
     //   
     //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf" which in this case is the command
         //from host computer
-//	read(usb_xbee,buf,2);
-
- //       if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
- //       else{printf("Wrong start byte!\n");}
+        printf("1\n");
+	read(usb_xbee,buf,2);
+printf("2\n");
+        if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
+        else{printf("Wrong start byte!\n");}
     
     //Why are we flushing HERE???
-//	tcflush(usb_xbee,TCIOFLUSH);
+	//tcflush(usb_xbee,TCIOFLUSH);
 
     //inputs map from buf[1] to controls: if buf[1] == ...
         //1-5       ==> motors ON/OFF
@@ -74,7 +75,6 @@ void *command_input(void *thread_id){
         //l/L, j/J ==> Inc/Dec phi_desired
         
         unsigned int command = buf[1];
-        
         switch (command) {
             case '1':
             case '2':
@@ -104,7 +104,7 @@ void *command_input(void *thread_id){
             case 'r':
             case 'R':
                 printf("Increase Thrust\n");
-                U_trim.thrust = U_trim.thrust + 4;
+                U_trim.thrust = U_trim.thrust + 50;//4;
                 break;
                 
             case 'f':
@@ -183,23 +183,15 @@ void *control_stabilizer(void *thread_id){
 
     while(SYSTEM_RUN) {
 
-        if(CONTROLLER_RUN == false) {   stop_motors();  }
+       // if(CONTROLLER_RUN == false) {   stop_motors();  }
 
 	    tcflush(usb_imu, TCIFLUSH);
-printf("1\n");
 
-	 //   res1 = read(usb_imu,&sensor_bytes2[0],24);
-	 
-printf("2\n");        
+	    res1 = read(usb_imu,&sensor_bytes2[0],24);
+      
         //distributes data from imu stored in buffer sensor_bytes2 to 
             //each field in imu_data
-       // unpack_data(imu_data, sensor_bytes2);
-         imu_data.psi = 0.;
-    imu_data.theta = 0.;
-    imu_data.phi = 0.;
-    imu_data.phi_dot = 0.;
-    imu_data.theta_dot = 0.;
-    imu_data.psi_dot =  0.;
+        unpack_data(imu_data, sensor_bytes2);
 
 	    tcflush(usb_imu, TCIFLUSH);
         
@@ -239,10 +231,10 @@ void start_motors(void){
     
     cout << "Starting Motors ..." << endl;
 
-    motor_1.set_force(30.0, CONTROLLER_RUN);
-    motor_2.set_force(30.0, CONTROLLER_RUN);
-    motor_3.set_force(30.0, CONTROLLER_RUN);
-    motor_4.set_force(30.0, CONTROLLER_RUN);
+    motor_1.set_force(30, true);
+    motor_2.set_force(30, CONTROLLER_RUN);
+    motor_3.set_force(30, CONTROLLER_RUN);
+    motor_4.set_force(30, CONTROLLER_RUN);
 }
 void stop_motors(void){
  
@@ -342,10 +334,10 @@ void send_forces(void){
     motor_4.send_force_i2c();
 }
 void display_info(const State& imu_data, const State& error){
-        printf("<==========================================>\n");
-        if(CONTROLLER_RUN == true) printf("Controller ON \n");
-        else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
-        printf("    IMU DATA    \n");
+        //printf("<==========================================>\n");
+        if(CONTROLLER_RUN == true) {
+        	printf("Controller ON \n");
+        	        printf("    IMU DATA    \n");
         printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
@@ -363,7 +355,9 @@ void display_info(const State& imu_data, const State& error){
         
         printf("    Errors      \n");
         printf("e_phi: %f,  e_theta: %f,    e_psi: %f\n\n\n",error.phi, error.theta, error.psi);
-        //printf("Motor out: %d\n", motor_out[0]);
+        }
+       // else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
+
 }
 
 
@@ -389,7 +383,7 @@ int main(void){
          	printf("\n Error opening an USB0 port!!\n");
          else
          	printf("Done!\n");
-  usleep(10000);
+  usleep(1000000);
 
   printf("opening usb port for imu...\n");
   usb_imu = open_port();
@@ -397,7 +391,7 @@ int main(void){
 	 	printf("Done!\n");
 	 else
 	 	printf("Fail to open usb port!\n");
-  usleep(100000);
+  usleep(1000000);
 
    // Initialize mutex and condition variables
      pthread_mutex_init(&data_acq_mutex, NULL);
