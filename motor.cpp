@@ -1,5 +1,5 @@
 #include "motor.h"
-
+#include <fcntl.h>
 #define MOTOR_PATH "/dev/i2c-4"
 
 
@@ -13,7 +13,7 @@ motor::motor(int motor_id, int i2c_address)
     
 }
  
-void motor::set_force( int force_in )
+void motor::set_force( int force_in, bool CONTROLLER_RUN )
 { //when setting force, check that ...
     //the motors are allowed to run (CONTROLLER_RUN flag is true)
     //the force is within acceptable bounds
@@ -65,8 +65,4 @@ int open_i2c(void){
     else            {cout << "Fail to open i2c port!" << endl;}
 
     return handle;
-}
-
-static int get_i2c(void){
-    return i2c_handle;
 }
