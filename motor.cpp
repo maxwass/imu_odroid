@@ -1,15 +1,14 @@
 #include "motor.h"
-#include <stdlib.h>
-#include <sys/ioctl.h>
+
 #define MOTOR_PATH "/dev/i2c-4"
-using namespace std;
+
 
 // Member functions definitions including constructor
-motor::motor(int which_motor, int comm_address)
+motor::motor(int motor_id, int i2c_address)
 {
-    cout << "Motor object is being created, motor = " << which_motor << endl;
-    motor_id = which_motor;
-    i2c_address = comm_address;
+    cout << "Motor object is being created, motor = " << motor_id << endl;
+    this -> motor_id = motor_id;
+    this -> i2c_address = i2c_address;
     i2c_handle = open_i2c();
     
 }
@@ -18,11 +17,11 @@ void motor::set_force( int force_in )
 { //when setting force, check that ...
     //the motors are allowed to run (CONTROLLER_RUN flag is true)
     //the force is within acceptable bounds
-    if(CONTROLLER_RUN) { force = ensure_valid_force(force_in) };   //ENSURE this has access to CONTROLLER_RUN
+    if(CONTROLLER_RUN) { force = ensure_valid_force(force_in) ;}  //ENSURE this has access to CONTROLLER_RUN
     shut_down();
 }
  
-int motor::get_force( void )
+uint8_t motor::get_force( void )
 { return force; }
 
 int motor::ensure_valid_force(int force_in)
@@ -30,7 +29,7 @@ int motor::ensure_valid_force(int force_in)
     // if not cap it at the max/min
     if(force_in > max_force) {return max_force;}
     if(force_in < min_force) {return min_force;}
-    return force_in
+    return force_in;
 }
 
 void motor::shut_down(void)
@@ -38,7 +37,7 @@ void motor::shut_down(void)
    send_force_i2c();
  }
 
-void motor::which_motor(void){
+int motor::which_motor(void){
 	return motor_id;
 }
 
