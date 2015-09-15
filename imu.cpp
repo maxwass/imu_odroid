@@ -84,7 +84,7 @@ void unpack_data(State& imu_data, const unsigned char arr[]){
     imu_data.psi_dot =  *(float *)&arr[20];
     //cout << "exit unpack_data" << endl;
     
-    print_data(imu_data);
+    //print_data(imu_data);
     
 }
 

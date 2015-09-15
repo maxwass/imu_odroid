@@ -7,8 +7,8 @@ struct timeval t_init, t_now, t_now_v;
 double t_v, del_t_v, t_prev_v = 0.0;
 
 volatile bool SYSTEM_RUN = true;
-volatile bool CONTROLLER_RUN = false;
-volatile bool DISPLAY_RUN = true;
+volatile bool CONTROLLER_RUN = true;
+volatile bool DISPLAY_RUN = false;
 
 int i2cHandle, usb_imu, usb_xbee, res1;
 
@@ -25,7 +25,6 @@ int address[4] = {0x2c, 0x29, 0x2b, 0x2a};
             // prints out i2c ports on odroid - need find which pin corresponds to which output i2c
              
 
-// IT SEEMS YOU CANNOT CALL FUNCTIONS IN THE PREPROCESSOR AREA???
 Desired_angles desired_angles;
 
 Gains gains;
@@ -74,8 +73,7 @@ void *command_input(void *thread_id){
         //l/L, j/J ==> Inc/Dec phi_desired
         
         unsigned int command = buf[1];
-        
-        
+
         switch (command) {
             case '1':
             case '2':
@@ -105,7 +103,7 @@ void *command_input(void *thread_id){
             case 'r':
             case 'R':
                 printf("Increase Thrust\n");
-                U_trim.thrust = U_trim.thrust + 4;
+                U_trim.thrust = U_trim.thrust + 50;//4;
                 break;
                 
             case 'f':
@@ -179,11 +177,12 @@ void *control_stabilizer(void *thread_id){
 
     while(SYSTEM_RUN) {
 
-        if(CONTROLLER_RUN == false) {   stop_motors();  }
+       // if(CONTROLLER_RUN == false) {   stop_motors();  }
 
 	    tcflush(usb_imu, TCIFLUSH);
+
 	    res1 = read(usb_imu,&sensor_bytes2[0],24);
-	        
+
         //distributes data from imu stored in buffer sensor_bytes2 to 
             //each field in imu_data
         unpack_data(imu_data, sensor_bytes2);
@@ -226,10 +225,10 @@ void start_motors(void){
     
     cout << "Starting Motors ..." << endl;
 
-    motor_1.set_force(30.0, CONTROLLER_RUN);
-    motor_2.set_force(30.0, CONTROLLER_RUN);
-    motor_3.set_force(30.0, CONTROLLER_RUN);
-    motor_4.set_force(30.0, CONTROLLER_RUN);
+    motor_1.set_force(30, true);
+    motor_2.set_force(30, CONTROLLER_RUN);
+    motor_3.set_force(30, CONTROLLER_RUN);
+    motor_4.set_force(30, CONTROLLER_RUN);
 }
 void stop_motors(void){
  
@@ -329,10 +328,10 @@ void send_forces(void){
     motor_4.send_force_i2c();
 }
 void display_info(const State& imu_data, const State& error){
-        printf("<==========================================>\n");
-        if(CONTROLLER_RUN == true) printf("Controller ON \n");
-        else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
-        printf("    IMU DATA    \n");
+        //printf("<==========================================>\n");
+        if(CONTROLLER_RUN == true) {
+        	printf("Controller ON \n");
+        	        printf("    IMU DATA    \n");
         printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
@@ -350,7 +349,9 @@ void display_info(const State& imu_data, const State& error){
         
         printf("    Errors      \n");
         printf("e_phi: %f,  e_theta: %f,    e_psi: %f\n\n\n",error.phi, error.theta, error.psi);
-        //printf("Motor out: %d\n", motor_out[0]);
+        }
+       // else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
+
 }
 
 
@@ -390,6 +391,7 @@ int main(void){
     gettimeofday(&t_init,NULL);
 
      // Initialize mutex and condition variables
+
      pthread_mutex_init(&data_acq_mutex, NULL);
     
      // Set thread attributes: FIFO scheduling, Joinable

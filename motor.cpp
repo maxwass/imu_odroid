@@ -22,13 +22,12 @@ motor::motor(int motor_id, int i2c_address)
     
 }
 
-
 void motor::set_force( int force_in, bool CONTROLLER_RUN )
 { //when setting force, check that ...
     //the motors are allowed to run (CONTROLLER_RUN flag is true)
     //the force is within acceptable bounds
-    if(CONTROLLER_RUN) { force = ensure_valid_force(force_in) ;}  //ENSURE this has access to CONTROLLER_RUN
-    shut_down();
+    if(CONTROLLER_RUN) { force = ensure_valid_force(force_in) ;} 
+
 }
  
 uint8_t motor::get_force( void )
@@ -60,17 +59,14 @@ void motor::send_force_i2c(void){
         //pointed buf to the file referred to by the file 
         //descriptor fd.
 
-    
-    //NOTE: USING FAKE FORCES FOR TESTING PURPOSES
-
-        uint8_t fake = 10;
-    int success_write = write(i2c_handle, &fake, 1);
+    int success_write = write(i2c_handle, &force, 1);
 
     if(success_write < 0) {
         cout << "Failed to write to motor" << motor_id << endl;
     }
 
 }
+
 
 int open_i2c(void){
     cout << "opening i2c port...";
