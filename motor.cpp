@@ -1,12 +1,5 @@
 #include "motor.h"
-#include <fcntl.h>
-<<<<<<< HEAD
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-=======
->>>>>>> origin
+
 #define MOTOR_PATH "/dev/i2c-4"
 
 int motor::open_i2c(void){
@@ -28,12 +21,9 @@ motor::motor(int motor_id, int i2c_address)
     i2c_handle = open_i2c();
     
 }
- 
-<<<<<<< HEAD
-void motor::set_force( int force_in , bool CONTROLLER_RUN)
-=======
+
+
 void motor::set_force( int force_in, bool CONTROLLER_RUN )
->>>>>>> origin
 { //when setting force, check that ...
     //the motors are allowed to run (CONTROLLER_RUN flag is true)
     //the force is within acceptable bounds
@@ -69,6 +59,10 @@ void motor::send_force_i2c(void){
         //write() writes up to count bytes from the buffer 
         //pointed buf to the file referred to by the file 
         //descriptor fd.
+
+    
+    //NOTE: USING FAKE FORCES FOR TESTING PURPOSES
+
         uint8_t fake = 10;
     int success_write = write(i2c_handle, &fake, 1);
 
@@ -78,12 +72,6 @@ void motor::send_force_i2c(void){
 
 }
 
-<<<<<<< HEAD
-
-//int get_i2c(void){
-//    return i2c_address;
-//}
-=======
 int open_i2c(void){
     cout << "opening i2c port...";
     int handle = open(MOTOR_PATH,O_RDWR);
@@ -93,4 +81,4 @@ int open_i2c(void){
 
     return handle;
 }
->>>>>>> origin
+
