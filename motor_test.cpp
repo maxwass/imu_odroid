@@ -32,7 +32,7 @@ Gains gains;
 
 Control_command U_trim;
 
-//create our motor objects
+//create our motor objects - accesible from all threads
 motor motor_1(1, address[0]);
 motor motor_2(2, address[1]);
 motor motor_3(3, address[2]);
@@ -41,24 +41,24 @@ motor motor_4(4, address[3]);
 
 //executes input from host computer on motors, controller gains, displays, and controller
 void *command_input(void *thread_id){
+ 
  //command from the host computer
  unsigned char buf[2];
     
-    while(SYSTEM_RUN == true) {
+    while(SYSTEM_RUN) {
         
     //discard data written to the object referred to by the file descriptor ("usb_xbee), TCIOFLUSH - flushes both
         //data received but not read, and data written but not transmitted.
 	tcflush(usb_xbee,TCIOFLUSH);
-    //   
+       
     //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf" which in this case is the command
         //from host computer
-//	read(usb_xbee,buf,2);
+    read(usb_xbee,buf,2);
 
- //       if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
- //       else{printf("Wrong start byte!\n");}
-    
-    //Why are we flushing HERE???
-//	tcflush(usb_xbee,TCIOFLUSH);
+        if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
+        else{printf("Wrong start byte!\n");}
+
+	tcflush(usb_xbee,TCIOFLUSH);
 
     //inputs map from buf[1] to controls: if buf[1] == ...
         //1-5       ==> motors ON/OFF
@@ -74,6 +74,7 @@ void *command_input(void *thread_id){
         //l/L, j/J ==> Inc/Dec phi_desired
         
         unsigned int command = buf[1];
+        
         
         switch (command) {
             case '1':
@@ -164,11 +165,6 @@ void *command_input(void *thread_id){
                 printf("Decrease phi_d ('phi desired') \n");
                 desired_angles.phi = desired_angles.phi - 1.0;
                 break;
-                
-         //   default:
-         //       printf("Command Input: Unrecognized input command");
-         //       cout << command << endl;
-         //       break;
         }
 
     }
@@ -186,20 +182,11 @@ void *control_stabilizer(void *thread_id){
         if(CONTROLLER_RUN == false) {   stop_motors();  }
 
 	    tcflush(usb_imu, TCIFLUSH);
-printf("1\n");
-
-	 //   res1 = read(usb_imu,&sensor_bytes2[0],24);
-	 
-printf("2\n");        
+	    res1 = read(usb_imu,&sensor_bytes2[0],24);
+	        
         //distributes data from imu stored in buffer sensor_bytes2 to 
             //each field in imu_data
-       // unpack_data(imu_data, sensor_bytes2);
-         imu_data.psi = 0.;
-    imu_data.theta = 0.;
-    imu_data.phi = 0.;
-    imu_data.phi_dot = 0.;
-    imu_data.theta_dot = 0.;
-    imu_data.psi_dot =  0.;
+        unpack_data(imu_data, sensor_bytes2);
 
 	    tcflush(usb_imu, TCIFLUSH);
         
@@ -215,7 +202,7 @@ printf("2\n");
         //send forces to motor via I2C
         send_forces();
 
-	    if(DISPLAY_RUN == true) { display_info(imu_data, error); }
+	    if(DISPLAY_RUN) { display_info(imu_data, error); }
 
     }
 
@@ -223,7 +210,7 @@ printf("2\n");
 }
 void *buffer_thread(void *thread_id){
     cout << "called buffer_thread: no content yet" << endl;
-    // while(SYSTEM_RUN == true) {
+    // while(SYSTEM_RUN) {
 
     // }
     pthread_exit(NULL);
@@ -368,41 +355,45 @@ void display_info(const State& imu_data, const State& error){
 
 
 int main(void){
-    cout <<"in main" << endl;
-    init();
-  //pthread_t - is an abstract datatype that is used as a handle to reference the thread
-  pthread_t threads[3];
-  //Special Attribute for starting thread (?)
-  pthread_attr_t attr;
-  //sched_param is a structure that maintains the scheduleing paramterts
-  struct sched_param	param;
-  int fifo_max_prio, fifo_min_prio;
+  //intialize desired angles, gains, and U_trim
+  init();
 
-  system("clear");
-  gettimeofday(&t_init,NULL);
- 
-  usleep(10000);
+ usleep(10000);
 
-  printf("Opening an USB port...   ");//Opens the usb Port
-  usb_xbee = open_usbport();
-	 if (usb_xbee <0)
-         	printf("\n Error opening an USB0 port!!\n");
+    printf("Opening an USB port...   ");//Opens the usb Port
+    usb_xbee = open_usbport();
+     if (usb_xbee <0)
+            printf("\n Error opening an USB0 port!!\n");
          else
-         	printf("Done!\n");
-  usleep(10000);
+            printf("Done!\n");
+    usleep(10000);
 
-  printf("opening usb port for imu...\n");
-  usb_imu = open_port();
-	 if (usb_imu > 0)
-	 	printf("Done!\n");
-	 else
-	 	printf("Fail to open usb port!\n");
-  usleep(100000);
+    printf("opening usb port for imu...\n");
+    usb_imu = open_port();
+     if (usb_imu > 0)
+        printf("Done!\n");
+     else
+        printf("Fail to open usb port!\n");
+    usleep(100000);
 
-   // Initialize mutex and condition variables
+    //pthread_t - is an abstract datatype that is used as a handle to reference the thread
+    pthread_t threads[3];
+    //Special Attribute for starting thread
+    pthread_attr_t attr;
+    //sched_param is a structure that maintains the scheduling parameters
+        //sched_param.sched_priority  - an integer value, the higher the value the higher a thread's proiority for scheduling
+    struct sched_param param;
+    int fifo_max_prio, fifo_min_prio;
+
+    
+    system("clear");
+    gettimeofday(&t_init,NULL);
+
+     // Initialize mutex and condition variables
      pthread_mutex_init(&data_acq_mutex, NULL);
     
-     // Set thread attributes
+     // Set thread attributes: FIFO scheduling, Joinable
+     // the sched_param.sched_priorirty is an int that must be in [min,max] for a certain schedule policy, in this case, SCHED_FIFO
      pthread_attr_init(&attr);
      pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
      pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -427,7 +418,7 @@ int main(void){
     
      // Wait for all threads to complete
      for (int i = 0; i < NUM_THREADS; i++)
-     {
+     {   //calling join will block this main thread until every thread exits
          pthread_join(threads[i], NULL);
      }
     
