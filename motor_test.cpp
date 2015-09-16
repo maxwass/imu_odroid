@@ -1,8 +1,5 @@
 #include "motor_test.h"
 
-pthread_mutex_t data_acq_mutex; 
-pthread_cond_t data_acq_cv;
-
 struct timeval t_init, t_now, t_now_v;
 double t_v, del_t_v, t_prev_v = 0.0;
 
@@ -92,18 +89,18 @@ void *command_input(void *thread_id){
                 
             case 't':
             case 'T':
-                controller_on_off(CONTROLLER_RUN);
+                controller_on_off();
                 break;
                 
             case 'p':
             case 'P':
-                display_on_off(DISPLAY_RUN);
+                display_on_off();
                 break;
                 
             case 'r':
             case 'R':
                 printf("Increase Thrust\n");
-                U_trim.thrust = U_trim.thrust + 50;//4;
+                U_trim.thrust = U_trim.thrust + 10;//4;
                 break;
                 
             case 'f':
@@ -171,13 +168,10 @@ void *command_input(void *thread_id){
 void *control_stabilizer(void *thread_id){
  
  unsigned char sensor_bytes2[24];
- int start_motor = 0x10; //16
-    
+
  State imu_data; 
 
     while(SYSTEM_RUN) {
-
-       // if(CONTROLLER_RUN == false) {   stop_motors();  }
 
 	    tcflush(usb_imu, TCIFLUSH);
 
@@ -193,13 +187,11 @@ void *control_stabilizer(void *thread_id){
         State error = state_error(imu_data, desired_angles);
         
         //calculate thrust and desired acceleration
-        Control_command U = thrust(error,U_trim, gains);
+        Control_command U = thrust(error, U_trim, gains);
 
    	    //calculate the forces of each motor and change force on motor objects
+        // and send via i2c
         set_forces(U,Ct,d);
-
-        //send forces to motor via I2C
-        send_forces();
 
 	    if(DISPLAY_RUN) { display_info(imu_data, error); }
 
@@ -215,6 +207,25 @@ void *buffer_thread(void *thread_id){
     pthread_exit(NULL);
 }
 void init(void){
+   
+    usleep(10000);
+
+    printf("Opening an USB port...   ");//Opens the usb Port
+    usb_xbee = open_usbport();
+     if (usb_xbee <0)
+            printf("\n Error opening an USB0 port!!\n");
+         else
+            printf("Done!\n");
+
+    usleep(10000);
+
+    printf("opening usb port for imu...\n");
+    usb_imu = open_port();
+     if (usb_imu > 0)
+        printf("Done!\n");
+     else
+        printf("Fail to open usb port!\n");
+
     set_desired_angles(desired_angles);
     set_gains(gains);
     set_Utrim(U_trim);
@@ -225,7 +236,7 @@ void start_motors(void){
     
     cout << "Starting Motors ..." << endl;
 
-    motor_1.set_force(30, true);
+    motor_1.set_force(30, CONTROLLER_RUN);
     motor_2.set_force(30, CONTROLLER_RUN);
     motor_3.set_force(30, CONTROLLER_RUN);
     motor_4.set_force(30, CONTROLLER_RUN);
@@ -239,17 +250,17 @@ void stop_motors(void){
     motor_3.shut_down();
     motor_4.shut_down();
 }
-void controller_on_off(bool CONTROLLER_RUN){
+void controller_on_off(void){
     if(CONTROLLER_RUN == false){
         printf("Controller ON!!\n");
         CONTROLLER_RUN = true;
         }
-    else if(CONTROLLER_RUN == true){
+    else{
         printf("Controller OFF!!\n");
         CONTROLLER_RUN = false;
         }
 }
-void display_on_off(bool DISPLAY_RUN){
+void display_on_off(){
     if(DISPLAY_RUN == false){
         printf("DISPLAY ON!!\n");
         DISPLAY_RUN = true;
@@ -296,7 +307,7 @@ Control_command thrust(const State& error, const Control_command& U_trim, const 
     //calculate thrust and acceleration
     //U[0] thrust, U[1:3]: roll acc, pitch acc, yaw acc
     Control_command U;
-    U.thrust = 30 + U_trim.roll_acc;
+    U.thrust = 30 + U_trim.thrust;
     U.roll_acc  = gains.kp_phi   * error.phi   + gains.kd_phi   * error.phi_dot   + U_trim.roll_acc;
     U.pitch_acc = gains.kp_theta * error.theta + gains.kd_theta * error.theta_dot + U_trim.pitch_acc;
     U.yaw_acc   = gains.kp_psi   * error.psi   + gains.kd_psi   * error.psi_dot   + U_trim.yaw_acc;
@@ -306,27 +317,16 @@ void set_forces(const Control_command& U, double Ct, double d){
     //calculate forces from thrusts and accelerations
     
       double force_1 = (U.thrust/4 - (U.yaw_acc  /(4*Ct))+(U.pitch_acc / (2*d)));
-      //     ff[0]   = (U[0]    /4 - (U[3]      /(4*Ct))+(U[2]        / (2*d)));
       double force_2 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
-      //     ff[1]   = (U[0]    /4 + (U[3]      /(4*Ct))-(U[1]        / (2*d)));
       double force_3 = (U.thrust/4 - (U.yaw_acc /(4*Ct))-(U.pitch_acc /  (2*d)));
-      //     ff[2]   = (U[0]    /4 - (U[3]      /(4*Ct))-(U[2]        / (2*d)));
       double force_4 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
-      //     ff[3]   = (U[0]    /4 + (U[3]      /(4*Ct))+(U[1]        / (2*d)));
-
 
       motor_1.set_force( round(force_1), CONTROLLER_RUN );
       motor_2.set_force( round(force_2), CONTROLLER_RUN );
       motor_3.set_force( round(force_3), CONTROLLER_RUN );
       motor_4.set_force( round(force_4), CONTROLLER_RUN );
 }
-void send_forces(void){
-    //send forces to all motors via I2C
-    motor_1.send_force_i2c();
-    motor_2.send_force_i2c();
-    motor_3.send_force_i2c();
-    motor_4.send_force_i2c();
-}
+
 void display_info(const State& imu_data, const State& error){
         //printf("<==========================================>\n");
         if(CONTROLLER_RUN == true) {
@@ -353,31 +353,11 @@ void display_info(const State& imu_data, const State& error){
        // else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
 
 }
-
-
-int main(void){
-  //intialize desired angles, gains, and U_trim
-  init();
-
- usleep(10000);
-
-    printf("Opening an USB port...   ");//Opens the usb Port
-    usb_xbee = open_usbport();
-     if (usb_xbee <0)
-            printf("\n Error opening an USB0 port!!\n");
-         else
-            printf("Done!\n");
-    usleep(10000);
-
-    printf("opening usb port for imu...\n");
-    usb_imu = open_port();
-     if (usb_imu > 0)
-        printf("Done!\n");
-     else
-        printf("Fail to open usb port!\n");
-    usleep(100000);
-
-    //pthread_t - is an abstract datatype that is used as a handle to reference the thread
+void configure_threads(void){
+//pthread_t - is an abstract datatype that is used as a handle to reference the thread
+    //threads[0] = control_stabilizer
+    //threads[1] = bufffer_thread
+    //threads[2] = command_input
     pthread_t threads[3];
     //Special Attribute for starting thread
     pthread_attr_t attr;
@@ -385,14 +365,10 @@ int main(void){
         //sched_param.sched_priority  - an integer value, the higher the value the higher a thread's proiority for scheduling
     struct sched_param param;
     int fifo_max_prio, fifo_min_prio;
-
     
     system("clear");
+
     gettimeofday(&t_init,NULL);
-
-     // Initialize mutex and condition variables
-
-     pthread_mutex_init(&data_acq_mutex, NULL);
     
      // Set thread attributes: FIFO scheduling, Joinable
      // the sched_param.sched_priorirty is an int that must be in [min,max] for a certain schedule policy, in this case, SCHED_FIFO
@@ -424,12 +400,22 @@ int main(void){
          pthread_join(threads[i], NULL);
      }
     
-  //   close(motor::get_i2c());
      close(usb_xbee);
      close(usb_imu);
     
      pthread_attr_destroy(&attr);
-     pthread_mutex_destroy(&data_acq_mutex);
+}
+
+
+int main(void){
+  //intialize desired angles, gains, U_trim, & open port ot xbee and imu
+    init();
+    
+    usleep(100000);
+
+    configure_threads();
+
+    
      return 0;
 }
 

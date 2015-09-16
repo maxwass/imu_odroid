@@ -53,16 +53,16 @@ void *buffer_thread(void *thread_id);
 void init(void);
 void start_motors(void);
 void stop_motors(void);
-void controller_on_off(bool CONTROLLER_RUN);
-void display_on_off(bool DISPLAY_RUN);
+void controller_on_off(void);
+void display_on_off(void);
 void set_Utrim(Control_command& U_trim);
 void set_gains(Gains& gains);
 void set_desired_angles(Desired_angles& desired_angles);
 State state_error(const State& imu_data, const Desired_angles& desired_angles);
 Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
-void send_forces(void);
 void display_info(const State& imu_data, const State& error);
+void configure_threads(void);
 
 
 #endif 

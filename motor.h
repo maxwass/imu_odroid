@@ -35,7 +35,7 @@ class motor
       void shut_down(void);
       int which_motor(void);
       void send_force_i2c(void);
-      int i2c_handle; // static variable
+      int i2c_handle;
       int open_i2c(void);
 
  

@@ -26,7 +26,12 @@ void motor::set_force( int force_in, bool CONTROLLER_RUN )
 { //when setting force, check that ...
     //the motors are allowed to run (CONTROLLER_RUN flag is true)
     //the force is within acceptable bounds
-    if(CONTROLLER_RUN) { force = ensure_valid_force(force_in) ;} 
+    if(CONTROLLER_RUN) { 
+        force = ensure_valid_force(force_in);
+        send_force_i2c();
+    }
+    else{ shut_down(); }
+
 
 }
  
