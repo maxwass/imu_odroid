@@ -47,12 +47,12 @@ void *command_input(void *thread_id){
         //data received but not read, and data written but not transmitted.
 	tcflush(usb_xbee,TCIOFLUSH);
        
-    //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf" which in this case is the command
-        //from host computer
+    //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf"
+        // which in this case is the command from host computer
     read(usb_xbee,buf,2);
 
         if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
-        else{printf("Wrong start byte!\n");}
+        else{printf("Problem reading from XBee: Wrong start byte!\n");}
 
 	tcflush(usb_xbee,TCIOFLUSH);
 
@@ -100,7 +100,7 @@ void *command_input(void *thread_id){
             case 'r':
             case 'R':
                 printf("Increase Thrust\n");
-                U_trim.thrust = U_trim.thrust + 10;//4;
+                U_trim.thrust = U_trim.thrust + 10;
                 break;
                 
             case 'f':
@@ -382,7 +382,7 @@ void configure_threads(void){
      // Higher priority for filter
      param.sched_priority = fifo_max_prio;
      pthread_attr_setschedparam(&attr, &param);
-     pthread_create(&threads[0], &attr, control_stabilizer, (void *) 0);
+     //pthread_create(&threads[0], &attr, control_stabilizer, (void *) 0);
     
      // Medium priority for vicon
      param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
@@ -415,7 +415,7 @@ int main(void){
 //test motors
     start_motors();
 
-    usleep(3000000)
+    usleep(3000000);
 //
     configure_threads();
 
