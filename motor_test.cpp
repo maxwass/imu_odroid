@@ -412,12 +412,15 @@ int main(void){
     init();
     
     usleep(100000);
-//test motors
-    start_motors();
-
-    usleep(3000000);
-//
     configure_threads();
+//test motors
+    while(1){
+     start_motors();
+    }
+ 
+//
+    stop_motors();
+    
 
     
      return 0;
