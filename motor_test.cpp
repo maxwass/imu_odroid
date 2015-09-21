@@ -415,7 +415,7 @@ int main(void){
 //test motors
     start_motors();
 
-    usleep(3000000)
+    usleep(3000000);
 //
     configure_threads();
 
