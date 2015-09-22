@@ -62,7 +62,7 @@ void set_desired_angles(Desired_angles& desired_angles);
 State state_error(const State& imu_data, const Desired_angles& desired_angles);
 Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
-void display_info(const State& imu_data, const State& error);
+void display_info(const State& imu_data, const State& error, const Control_command& U);
 void configure_threads(void);
 
 
