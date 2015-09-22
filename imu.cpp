@@ -112,7 +112,7 @@ void get_data(const int port, State& imu_data)
     //result1 indicates success of reading
     int result = read(port, &sensor_bytes2[0], 24);
 
-    cout << "number of bytes read into sensor_bytes: " << result << endl;
+    //cout << "number of bytes read into sensor_bytes: " << result << endl;
 
     //For error message
     if (result == -1){  printf("get_data: FAILED read from port \n");}
@@ -125,7 +125,7 @@ void get_data(const int port, State& imu_data)
 
 
 
-
+/*
 int main (void)
 {
     // File descriptor for the port 
@@ -135,11 +135,11 @@ int main (void)
     while(1)
     {   //pull data from sensor and put into imu_data
         get_data(port, imu_data);
-        print_data(imu_data);
+        //print_data(imu_data);
     }
     
     
     return 0;
 }
 
-
+*/
