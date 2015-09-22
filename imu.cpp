@@ -22,13 +22,22 @@ int open_port()
     if(port > -1){ cout << "opened port successfully: " << MY_PATH << endl; }
     else         { cout << "unable to open port: "      << MY_PATH << endl; }
     
+    //sets the parameters associated with the terminal
+    //from the termios structure referred to by newtio.
     tcgetattr(port, &newtio);
+
+    //set input/output baudrate
     cfsetospeed(&newtio, BAUDRATE);
     cfsetispeed(&newtio, BAUDRATE);
     
+    //set character size mask.
     //set the number of data bits.
-    newtio.c_cflag &= ~CSIZE;  // Mask the character size bits
-    newtio.c_cflag |= CS8;
+   
+    //CSIZE flag is a mask that specifies the number of bits per byte for both transmission 
+    //and reception. This size does not include the parity bit, if any. The values for the 
+    //field defined by this mask are CS5, CS6, CS7, and CS8, for 5, 6, 7,and 8 bits per byte, respectively
+    newtio.c_cflag &= ~CSIZE; 
+    newtio.c_cflag |= CS8;     //8 bits/byte
     
     //set the number of stop bits to 1
     newtio.c_cflag &= ~CSTOPB;
@@ -39,9 +48,11 @@ int open_port()
     //set for non-canonical (raw processing, no echo, etc.)
     newtio.c_iflag = IGNPAR; // ignore parity check close_port(int
     newtio.c_oflag = 0; // raw output
+    newtio.c_lflag = 0; // raw input (this puts us in non-canonical mode!)
     
     
     //Time-Outs -- won't work with NDELAY option in the call to open
+    //Will read until recieved a minimum of 24 bytes, no time limit
     newtio.c_cc[VMIN]  = 24;   // block reading until RX x characers. If x = 0, it is non-blocking.
     newtio.c_cc[VTIME] = 0;   // Inter-Character Timer -- i.e. timeout= x*.1 s
     
@@ -49,6 +60,7 @@ int open_port()
     newtio.c_cflag |= (CLOCAL | CREAD);
     
     //Set the new options for the port...
+    //TCSANOW - options go into affect immediately
     int status = tcsetattr(port, TCSANOW, &newtio);
     
     if (status != 0){ //For error message
@@ -66,7 +78,7 @@ void print_data(const State& imu_data)
     cout << "theta_dot: " << imu_data.theta_dot;
     cout << "     phi_dot: " << imu_data.phi_dot;
     cout << "     psi_dot: " << imu_data.psi_dot << endl;
-    
+    cout << endl << endl;
 }
 
 void unpack_data(State& imu_data, const unsigned char arr[]){
@@ -75,17 +87,16 @@ void unpack_data(State& imu_data, const unsigned char arr[]){
     //the cast to a float pointer takes the first four bytes in the array 'arr',
     //thus constructing a float
     
-    //cout << "enter unpack_data" << endl;
-    imu_data.psi = *(float *)&arr[0];
-    imu_data.theta = *(float *)&arr[4];
-    imu_data.phi = *(float *)&arr[8];
-    imu_data.phi_dot = *(float *)&arr[12];
-    imu_data.theta_dot = *(float *)&arr[16];
-    imu_data.psi_dot =  *(float *)&arr[20];
-    //cout << "exit unpack_data" << endl;
-    
-    //print_data(imu_data);
-    
+	//cout << "enter unpack_data" << endl;
+
+	imu_data.psi = *(float *)&arr[0];
+	imu_data.theta = *(float *)&arr[4];
+	imu_data.phi = *(float *)&arr[8];
+	imu_data.phi_dot = *(float *)&arr[12];
+	imu_data.theta_dot = *(float *)&arr[16];
+	imu_data.psi_dot =  *(float *)&arr[20];
+
+	//cout << "exit unpack_data" << endl;
 }
 
 void get_data(const int port, State& imu_data)
@@ -100,19 +111,21 @@ void get_data(const int port, State& imu_data)
     //read in 24 bytes of data from port to the address in memory &sensor_bytes2
     //result1 indicates success of reading
     int result = read(port, &sensor_bytes2[0], 24);
-    
+
+    cout << "number of bytes read into sensor_bytes: " << result << endl;
+
     //For error message
     if (result == -1){  printf("get_data: FAILED read from port \n");}
-    
+
     unpack_data(imu_data, sensor_bytes2);
     
-    //cout << "exit get_data" << endl;
+   // cout << "exit get_data" << endl;
     
 }
 
 
 
-/*
+
 int main (void)
 {
     // File descriptor for the port 
@@ -121,12 +134,12 @@ int main (void)
     State imu_data;
     while(1)
     {   //pull data from sensor and put into imu_data
-        get_data(port, imu_data); //WAS SUTCK IN read
+        get_data(port, imu_data);
         print_data(imu_data);
     }
     
     
     return 0;
-}*/
+}
 
 
