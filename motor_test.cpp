@@ -11,6 +11,10 @@ int i2cHandle, usb_imu, usb_xbee, res1;
 
 double Ct=0.013257116418667*10;
 double d=0.169;
+//signal frequency = 1/frequency = frequency in Hz
+int onesecond = 1000000;
+int frequency = 200;
+int signal_frequency = onesecond/frequency;
 
 //The address of i2c
 int address[4] = {0x2c, 0x29, 0x2b, 0x2a};
@@ -40,21 +44,27 @@ void *command_input(void *thread_id){
  
  //command from the host computer
  unsigned char buf[2];
-    
+
+    cout << "INSIDE COMMAND_INPUT" << endl;
+
     while(SYSTEM_RUN) {
-        
+      
+   // cout << " ==>inside command_input while loop" << endl;
+
+ 
     //discard data written to the object referred to by the file descriptor ("usb_xbee), TCIOFLUSH - flushes both
         //data received but not read, and data written but not transmitted.
-	tcflush(usb_xbee,TCIOFLUSH);
+//	tcflush(usb_xbee,TCIOFLUSH);
        
     //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf"
         // which in this case is the command from host computer
-    read(usb_xbee,buf,2);
+ //     read(usb_xbee,buf,2);
 
-        if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
-        else{printf("Problem reading from XBee: Wrong start byte!\n");}
 
-	tcflush(usb_xbee,TCIOFLUSH);
+  //      if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
+    //    else{printf("Problem reading from XBee: Wrong start byte!\n");}
+
+//	tcflush(usb_xbee,TCIOFLUSH);
 
     //inputs map from buf[1] to controls: if buf[1] == ...
         //1-5       ==> motors ON/OFF
@@ -69,9 +79,14 @@ void *command_input(void *thread_id){
     //Phi
         //l/L, j/J ==> Inc/Dec phi_desired
         
-        unsigned int command = buf[1];
-
-        switch (command) {
+       // unsigned int command = buf[1];
+        char command = '0';
+	cout <<"    please give input for command_input: "; 
+	cin >> command;
+	
+	cout << " ==== taken input: " << command << endl;
+        
+	switch (command) {
             case '1':
             case '2':
             case '3':
@@ -100,13 +115,20 @@ void *command_input(void *thread_id){
             case 'r':
             case 'R':
                 printf("Increase Thrust\n");
-                U_trim.thrust = U_trim.thrust + 10;
-                break;
+		cout << " ==> Old Thrust: " <<  U_trim.thrust << endl;
+		U_trim.thrust = U_trim.thrust + 30;
+		cout << " ==> New Thrust: " <<  U_trim.thrust << endl;
+ 
+    	//	motor_1.set_force(60, CONTROLLER_RUN);
+	//	motor_2.set_force(60, CONTROLLER_RUN);
+	//	motor_3.set_force(60, CONTROLLER_RUN);
+	//	motor_4.set_force(60, CONTROLLER_RUN);
+		 break;
                 
             case 'f':
             case 'F':
                 printf("Decrease Thrust!\n");
-                U_trim.thrust = U_trim.thrust - 4;
+                U_trim.thrust = U_trim.thrust - 30;
                 break;
                 
             case 'w':
@@ -167,21 +189,23 @@ void *command_input(void *thread_id){
 }
 void *control_stabilizer(void *thread_id){
  
+cout << "INSIDE CONTROL_STABALIZER" << endl;
+
  unsigned char sensor_bytes2[24];
 
  State imu_data; 
 
     while(SYSTEM_RUN) {
 
-	    tcflush(usb_imu, TCIFLUSH);
+	tcflush(usb_imu, TCIFLUSH);
 
-	    res1 = read(usb_imu,&sensor_bytes2[0],24);
+	res1 = read(usb_imu,&sensor_bytes2[0],24);
 
         //distributes data from imu stored in buffer sensor_bytes2 to 
             //each field in imu_data
         unpack_data(imu_data, sensor_bytes2);
 
-	    tcflush(usb_imu, TCIFLUSH);
+        tcflush(usb_imu, TCIFLUSH);
         
         //calculate error between desired and measured state
         State error = state_error(imu_data, desired_angles);
@@ -196,14 +220,38 @@ void *control_stabilizer(void *thread_id){
 	    if(DISPLAY_RUN) { display_info(imu_data, error); }
 
     }
+cout << "EXIT CONTROL_STABILIZER" << endl;
 
     pthread_exit(NULL);
 }
-void *buffer_thread(void *thread_id){
+void *motor_signal(void *thread_id){
+
+cout << "INSIDE MOTOR_SIGNAL" << endl;
+
+      while(SYSTEM_RUN){
+//cout << "SENDING FORCES" << endl;
+	motor_1.send_force_i2c();
+	motor_2.send_force_i2c();
+	motor_3.send_force_i2c();
+	motor_4.send_force_i2c();
+	//send at about 200Hz
+	usleep(200);
+	}
+
+cout << "EXIT MOTOR_SIGNAL" << endl;
+
+   pthread_exit(NULL);
+
+
+}
+
+void *buffer_thread(void *thread_id){ 
+    cout << "INSIDE BUFFER_THREAD" << endl;
     cout << "called buffer_thread: no content yet" << endl;
     // while(SYSTEM_RUN) {
 
     // }
+    cout << "EXIT BUFFER_THREAD" << endl;
     pthread_exit(NULL);
 }
 void init(void){
@@ -358,7 +406,9 @@ void configure_threads(void){
     //threads[0] = control_stabilizer
     //threads[1] = bufffer_thread
     //threads[2] = command_input
-    pthread_t threads[3];
+    //threads[3] = motor_signal
+
+    pthread_t threads[NUM_THREADS];
     //Special Attribute for starting thread
     pthread_attr_t attr;
     //sched_param is a structure that maintains the scheduling parameters
@@ -366,9 +416,11 @@ void configure_threads(void){
     struct sched_param param;
     int fifo_max_prio, fifo_min_prio;
     
-    system("clear");
+     system("clear");
 
-    gettimeofday(&t_init,NULL);
+     cout << "INSIDE CONFIGURE_THREADS" << endl;
+    
+     gettimeofday(&t_init,NULL);
     
      // Set thread attributes: FIFO scheduling, Joinable
      // the sched_param.sched_priorirty is an int that must be in [min,max] for a certain schedule policy, in this case, SCHED_FIFO
@@ -376,30 +428,45 @@ void configure_threads(void){
      pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
      pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
      fifo_max_prio = sched_get_priority_max(SCHED_FIFO);
-     fifo_min_prio = sched_get_priority_min(SCHED_FIFO);
-    
+     fifo_min_prio = sched_get_priority_min(SCHED_FIFO); 
+
      // Create threads
+     
+     cout << "=> creating control_stabilizer thread" << endl;
      // Higher priority for filter
      param.sched_priority = fifo_max_prio;
      pthread_attr_setschedparam(&attr, &param);
-     //pthread_create(&threads[0], &attr, control_stabilizer, (void *) 0);
-    
+     pthread_create(&threads[0], &attr, control_stabilizer, (void *) 0);
+
+     //cout << "=> creating buffer_thread thread" << endl;
      // Medium priority for vicon
      param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
      pthread_attr_setschedparam(&attr, &param);
-     pthread_create(&threads[1], &attr, buffer_thread, (void *) 1);
-    
+     //pthread_create(&threads[1], &attr, buffer_thread, (void *) 1);
+
+     cout << "=> creating motor_signal thread" << endl;
+     // Medium priority for motor_signal
+     param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
+     pthread_attr_setschedparam(&attr, &param);
+     pthread_create(&threads[3], &attr, motor_signal, (void *) 3);
+
+     cout << "=> creating command_input thread" << endl;
      // Lower priority for vicon
      param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
      pthread_attr_setschedparam(&attr, &param);
      pthread_create(&threads[2], &attr, command_input, (void *) 2);
     
+
      // Wait for all threads to complete
-     for (int i = 0; i < NUM_THREADS; i++)
-     {   //calling join will block this main thread until every thread exits
-         pthread_join(threads[i], NULL);
-     }
-    
+    // for (int i = 0; i < NUM_THREADS; i++)
+    // {   //calling join will block this main thread until every thread exits
+    //     pthread_join(threads[i], NULL);
+    // }
+
+   
+ pthread_join(threads[0], NULL);
+ pthread_join(threads[3], NULL);
+     cout << "EXITING CONFIGURE_THREADS" << endl;
      close(usb_xbee);
      close(usb_imu);
     
@@ -407,24 +474,19 @@ void configure_threads(void){
 }
 
 
+
+
 int main(void){
   //intialize desired angles, gains, U_trim, & open port ot xbee and imu
     init();
+    usleep(onesecond);
     
-    usleep(100000);
-    configure_threads();
 //test motors
-
-    while(1){
-     start_motors();
-    }
+//it seems like motors sample for input between .1 and .01 seconds
+   start_motors();
+   configure_threads();
  
 
-//
-    stop_motors();
-    
-
-    
-     return 0;
+   return 0;
 }
 
