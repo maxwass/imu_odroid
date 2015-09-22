@@ -17,7 +17,7 @@ int frequency = 200;
 int signal_frequency = onesecond/frequency;
 
 //The address of i2c
-int address[4] = {0x2c, 0x29, 0x2b, 0x2a};
+int address[4] = {0x2b, 0x2a, 0x2c, 0x29};
 
 //finding motor addresses:
     //different pad combinations make 4 different addresses
@@ -320,12 +320,12 @@ state state_error(const State& imu_data, const Desired_angles& desired_angles){
     //calculate error in RADIANS
     //  xxx_d is xxx_desired.  imu outputs  degrees, we convert to radians with factor PI/180
     State error;
-    error.phi       =     (-imu_data.phi    +   desired_angles.phi); //* PI/180;
-    error.theta     =     (-imu_data.theta  + desired_angles.theta);// * PI/180;
-    error.psi       =     (-imu_data.psi    +   desired_angles.psi);// * PI/180;
-    error.phi_dot   =                           (-imu_data.phi_dot);// * PI/180;
-    error.theta_dot =                         (-imu_data.theta_dot);// * PI/180;
-    error.psi_dot   =                           (-imu_data.psi_dot);// * PI/180;
+    error.phi       =     (-imu_data.phi    +   desired_angles.phi) * PI/180;
+    error.theta     =     (-imu_data.theta  + desired_angles.theta) * PI/180;
+    error.psi       =     (-imu_data.psi    +   desired_angles.psi) * PI/180;
+    error.phi_dot   =                           (-imu_data.phi_dot) * PI/180;
+    error.theta_dot =                         (-imu_data.theta_dot) * PI/180;
+    error.psi_dot   =                           (-imu_data.psi_dot) * PI/180;
     return error;
 }
 Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains){
@@ -340,10 +340,10 @@ Control_command thrust(const State& error, const Control_command& U_trim, const 
 }
 void set_forces(const Control_command& U, double Ct, double d){
       //calculate forces from thrusts and accelerations
-      double force_1 = (U.thrust/4 - (U.yaw_acc  /(4*Ct))+(U.pitch_acc / (2*d)));
-      double force_2 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
-      double force_3 = (U.thrust/4 - (U.yaw_acc /(4*Ct))-(U.pitch_acc /  (2*d)));
-      double force_4 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
+      double force_1 = (U.thrust/4 - (U.yaw_acc /(4*Ct)) + (U.pitch_acc /  (2*d)));
+      double force_2 = (U.thrust/4 + (U.yaw_acc /(4*Ct)) - (U.roll_acc  /  (2*d)));
+      double force_3 = (U.thrust/4 - (U.yaw_acc /(4*Ct)) - (U.pitch_acc /  (2*d)));
+      double force_4 = (U.thrust/4 + (U.yaw_acc /(4*Ct)) + (U.roll_acc  /  (2*d)));
 
       //round forces to be integers
       motor_1.set_force( round(force_1), CONTROLLER_RUN );
