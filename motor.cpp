@@ -63,8 +63,7 @@ void motor::send_force_i2c(void){
         //write() writes up to count bytes from the buffer 
         //pointed buf to the file referred to by the file 
         //descriptor fd.
-
-    int success_write = write(i2c_handle, &force, 1);
+    int success_write = write(i2c_handle, &force, 1);//add &force back
 
     if(success_write < 0) {
         cout << "Failed to write to motor" << motor_id << endl;

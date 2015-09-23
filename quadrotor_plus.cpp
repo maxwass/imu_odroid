@@ -533,7 +533,8 @@ end
         
         if (U_thrust > 300.0)
         U_thrust = 300.0;
-        double sat_val = 15.0;
+        //15 degrees
+	double sat_val = 15.0;
         if (phi_d > sat_val)
         phi_d = sat_val;
         else if (phi_d < -sat_val)
