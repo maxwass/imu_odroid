@@ -11,16 +11,19 @@ int i2cHandle, usb_imu, usb_xbee, res1;
 
 double Ct=0.013257116418667*10;
 double d=0.169;
+//signal frequency = 1/frequency = frequency in Hz
+int onesecond = 1000000;
+int frequency = 200;
+int signal_frequency = onesecond/frequency;
 
 //The address of i2c
-int address[4] = {0x2c, 0x29, 0x2b, 0x2a};
+int address[4] = {0x2b, 0x2a, 0x2c, 0x29};
 
 //finding motor addresses:
     //different pad combinations make 4 different addresses
     //download i2c library - i2c-tools : sudo apt_get ... i2c-tools
     //check for i2c addresses: sudo i2cdetect -y -l
             // prints out i2c ports on odroid - need find which pin corresponds to which output i2c
-             
 
 Desired_angles desired_angles;
 
@@ -40,19 +43,24 @@ void *command_input(void *thread_id){
  
  //command from the host computer
  unsigned char buf[2];
-    
+
+    cout << "INSIDE COMMAND_INPUT" << endl;
+
     while(SYSTEM_RUN) {
-        
+      
+   // cout << " ==>inside command_input while loop" << endl;
+
+ 
     //discard data written to the object referred to by the file descriptor ("usb_xbee), TCIOFLUSH - flushes both
         //data received but not read, and data written but not transmitted.
 	tcflush(usb_xbee,TCIOFLUSH);
        
-    //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf" which in this case is the command
-        //from host computer
-    read(usb_xbee,buf,2);
+    //read 2 bytes from file descriptor "usb_xbee" into buffer starting at "buf"
+        // which in this case is the command from host computer
+        read(usb_xbee,buf,2);
 
-        if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
-        else{printf("Wrong start byte!\n");}
+          if (buf[0] == 0xBD){printf("recieved: %c\n",buf[1]);}
+          else{printf("Problem reading from XBee: Wrong start byte!\n");}
 
 	tcflush(usb_xbee,TCIOFLUSH);
 
@@ -69,9 +77,12 @@ void *command_input(void *thread_id){
     //Phi
         //l/L, j/J ==> Inc/Dec phi_desired
         
-        unsigned int command = buf[1];
-
-        switch (command) {
+        unsigned char command = buf[1];
+       // char command = '0';
+//	cout <<"    please give input for command_input: "; 
+//	cin >> command;
+        
+	switch (command) {
             case '1':
             case '2':
             case '3':
@@ -100,13 +111,14 @@ void *command_input(void *thread_id){
             case 'r':
             case 'R':
                 printf("Increase Thrust\n");
-                U_trim.thrust = U_trim.thrust + 10;//4;
-                break;
+		U_trim.thrust = U_trim.thrust + 30;
+		cout << U_trim.thrust << endl;
+		break;
                 
             case 'f':
             case 'F':
                 printf("Decrease Thrust!\n");
-                U_trim.thrust = U_trim.thrust - 4;
+                U_trim.thrust = U_trim.thrust - 30;
                 break;
                 
             case 'w':
@@ -167,43 +179,59 @@ void *command_input(void *thread_id){
 }
 void *control_stabilizer(void *thread_id){
  
- unsigned char sensor_bytes2[24];
+cout << "INSIDE CONTROL_STABALIZER" << endl;
 
  State imu_data; 
 
     while(SYSTEM_RUN) {
 
-	    tcflush(usb_imu, TCIFLUSH);
+	//flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
+	get_data(usb_imu, imu_data);
 
-	    res1 = read(usb_imu,&sensor_bytes2[0],24);
-
-        //distributes data from imu stored in buffer sensor_bytes2 to 
-            //each field in imu_data
-        unpack_data(imu_data, sensor_bytes2);
-
-	    tcflush(usb_imu, TCIFLUSH);
-        
-        //calculate error between desired and measured state
+        //calculate error (in radians) between desired and measured state
         State error = state_error(imu_data, desired_angles);
         
         //calculate thrust and desired acceleration
         Control_command U = thrust(error, U_trim, gains);
 
-   	    //calculate the forces of each motor and change force on motor objects
+   	//calculate the forces of each motor and change force on motor objects
         // and send via i2c
         set_forces(U,Ct,d);
 
-	    if(DISPLAY_RUN) { display_info(imu_data, error); }
+	if(DISPLAY_RUN) { display_info(imu_data, error, U); }
 
     }
+cout << "EXIT CONTROL_STABILIZER" << endl;
 
     pthread_exit(NULL);
 }
-void *buffer_thread(void *thread_id){
+void *motor_signal(void *thread_id){
+
+cout << "INSIDE MOTOR_SIGNAL" << endl;
+
+      while(SYSTEM_RUN){
+//cout << "SENDING FORCES" << endl;
+	motor_1.send_force_i2c();
+	motor_2.send_force_i2c();
+	motor_3.send_force_i2c();
+	motor_4.send_force_i2c();
+	//send at about 200Hz
+	usleep(200);
+	}
+
+cout << "EXIT MOTOR_SIGNAL" << endl;
+
+   pthread_exit(NULL);
+
+}
+
+void *buffer_thread(void *thread_id){ 
+    cout << "INSIDE BUFFER_THREAD" << endl;
     cout << "called buffer_thread: no content yet" << endl;
     // while(SYSTEM_RUN) {
 
     // }
+    cout << "EXIT BUFFER_THREAD" << endl;
     pthread_exit(NULL);
 }
 void init(void){
@@ -231,9 +259,7 @@ void init(void){
     set_Utrim(U_trim);
 }
 void start_motors(void){
-//this is for testing to see which motor is which
     //set speed to 30 out of 255
-    
     cout << "Starting Motors ..." << endl;
 
     motor_1.set_force(30, CONTROLLER_RUN);
@@ -242,7 +268,6 @@ void start_motors(void){
     motor_4.set_force(30, CONTROLLER_RUN);
 }
 void stop_motors(void){
- 
     cout << "Stopping Motors ..." << endl;
 
     motor_1.shut_down();
@@ -314,43 +339,45 @@ Control_command thrust(const State& error, const Control_command& U_trim, const 
     return U;
 }
 void set_forces(const Control_command& U, double Ct, double d){
-    //calculate forces from thrusts and accelerations
-    
-      double force_1 = (U.thrust/4 - (U.yaw_acc  /(4*Ct))+(U.pitch_acc / (2*d)));
-      double force_2 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
-      double force_3 = (U.thrust/4 - (U.yaw_acc /(4*Ct))-(U.pitch_acc /  (2*d)));
-      double force_4 = (U.thrust/4 - (U.yaw_acc /(4*Ct))+(U.roll_acc  /  (2*d)));
+      //calculate forces from thrusts and accelerations
+      double force_1 = (U.thrust/4 - (U.yaw_acc /(4*Ct)) + (U.pitch_acc /  (2*d)));
+      double force_2 = (U.thrust/4 + (U.yaw_acc /(4*Ct)) - (U.roll_acc  /  (2*d)));
+      double force_3 = (U.thrust/4 - (U.yaw_acc /(4*Ct)) - (U.pitch_acc /  (2*d)));
+      double force_4 = (U.thrust/4 + (U.yaw_acc /(4*Ct)) + (U.roll_acc  /  (2*d)));
 
+      //round forces to be integers
       motor_1.set_force( round(force_1), CONTROLLER_RUN );
       motor_2.set_force( round(force_2), CONTROLLER_RUN );
       motor_3.set_force( round(force_3), CONTROLLER_RUN );
       motor_4.set_force( round(force_4), CONTROLLER_RUN );
 }
 
-void display_info(const State& imu_data, const State& error){
-        //printf("<==========================================>\n");
-        if(CONTROLLER_RUN == true) {
-        	printf("Controller ON \n");
-        	        printf("    IMU DATA    \n");
+void display_info(const State& imu_data, const State& error, const Control_command& U ){
+        printf("<==========================================>\n");
+       	
+	printf("Controller ON \n");
+       	printf("    IMU DATA    \n");
         printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
 
-        printf("    GAINS       \n");
-        printf("kp_phi: %f  kd_phi: %f\n",gains.kp_phi, gains.kd_phi);
-        printf("kp_theta: %f    kd_theta: %f\n",gains.kp_theta, gains.kd_theta);
-        printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
+       // printf("    GAINS       \n");
+       // printf("kp_phi: %f  kd_phi: %f\n",gains.kp_phi, gains.kd_phi);
+       // printf("kp_theta: %f    kd_theta: %f\n",gains.kp_theta, gains.kd_theta);
+       // printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
 
-        printf("    MOTOR_OUT   \n");
-        printf("Motor #1: %i\n",     motor_1.get_force());
-        printf("Motor #2: %i\n",     motor_2.get_force());        
-        printf("Motor #3: %i\n",     motor_3.get_force());
-        printf("Motor #4: %i\n\n\n", motor_4.get_force());
-        
-        printf("    Errors      \n");
+        printf("    Errors (rad or degrees: currently degrees)      \n");
         printf("e_phi: %f,  e_theta: %f,    e_psi: %f\n\n\n",error.phi, error.theta, error.psi);
-        }
-       // else if (CONTROLLER_RUN == false) printf("Controller OFF \n");
+
+        printf("     Acceleration (N/s^2)      \n");
+        printf("roll_acc: %f,   pitch_acc: %f,    yaw_acc: %f \n\n\n", U.roll_acc, U.pitch_acc, U.yaw_acc);
+
+	printf("    Thrust (0-255)     \n");
+	printf("thrust: %i \n\n\n", U.thrust);
+
+        printf("    Forces (0-255)     \n");
+        printf("motor_1: %i,  motor_2: %i,   motor_3: %i,    motor_4: %i \n\n\n", motor_1.get_force(), motor_2.get_force() , motor_3.get_force(), motor_4.get_force());
+
 
 }
 void configure_threads(void){
@@ -358,7 +385,9 @@ void configure_threads(void){
     //threads[0] = control_stabilizer
     //threads[1] = bufffer_thread
     //threads[2] = command_input
-    pthread_t threads[3];
+    //threads[3] = motor_signal
+
+    pthread_t threads[NUM_THREADS];
     //Special Attribute for starting thread
     pthread_attr_t attr;
     //sched_param is a structure that maintains the scheduling parameters
@@ -366,9 +395,11 @@ void configure_threads(void){
     struct sched_param param;
     int fifo_max_prio, fifo_min_prio;
     
-    system("clear");
+     system("clear");
 
-    gettimeofday(&t_init,NULL);
+     cout << "INSIDE CONFIGURE_THREADS" << endl;
+    
+     gettimeofday(&t_init,NULL);
     
      // Set thread attributes: FIFO scheduling, Joinable
      // the sched_param.sched_priorirty is an int that must be in [min,max] for a certain schedule policy, in this case, SCHED_FIFO
@@ -376,30 +407,42 @@ void configure_threads(void){
      pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
      pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
      fifo_max_prio = sched_get_priority_max(SCHED_FIFO);
-     fifo_min_prio = sched_get_priority_min(SCHED_FIFO);
-    
-     // Create threads
+     fifo_min_prio = sched_get_priority_min(SCHED_FIFO); 
+
+     	// Create threads
+     
+     cout << "=> creating control_stabilizer thread" << endl;
      // Higher priority for filter
      param.sched_priority = fifo_max_prio;
      pthread_attr_setschedparam(&attr, &param);
      pthread_create(&threads[0], &attr, control_stabilizer, (void *) 0);
-    
+
+     cout << "=> creating buffer_thread thread" << endl;
      // Medium priority for vicon
      param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
      pthread_attr_setschedparam(&attr, &param);
      pthread_create(&threads[1], &attr, buffer_thread, (void *) 1);
-    
+
+     cout << "=> creating motor_signal thread" << endl;
+     // Medium priority for motor_signal
+     param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
+     pthread_attr_setschedparam(&attr, &param);
+     pthread_create(&threads[3], &attr, motor_signal, (void *) 3);
+
+     cout << "=> creating command_input thread" << endl;
      // Lower priority for vicon
      param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
      pthread_attr_setschedparam(&attr, &param);
      pthread_create(&threads[2], &attr, command_input, (void *) 2);
     
+
      // Wait for all threads to complete
-     for (int i = 0; i < NUM_THREADS; i++)
-     {   //calling join will block this main thread until every thread exits
+       for (int i = 0; i < NUM_THREADS; i++)  {  
+	 //calling join will block this main thread until every thread exits
          pthread_join(threads[i], NULL);
-     }
-    
+        }
+
+     cout << "EXITING CONFIGURE_THREADS" << endl;
      close(usb_xbee);
      close(usb_imu);
     
@@ -407,19 +450,18 @@ void configure_threads(void){
 }
 
 
+
+
 int main(void){
-  //intialize desired angles, gains, U_trim, & open port ot xbee and imu
-    init();
-    
-    usleep(100000);
-//test motors
-    start_motors();
+	//intialize desired angles, gains, U_trim, & open port ot xbee and imu
+	init();
 
-    usleep(3000000)
-//
-    configure_threads();
-
+	usleep(onesecond);
     
-     return 0;
+	start_motors();
+
+	configure_threads();
+
+	return 0;
 }
 

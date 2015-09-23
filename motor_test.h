@@ -19,12 +19,12 @@
 #include "motor.h"   //#include because motor_test contains a motor object
 #include "imu.h"
 #include "receiver.h"
-
+#include <time.h>
 //=================================
 // forward declared dependencies
 //struct State;
 
-#define NUM_THREADS 3
+#define NUM_THREADS 4
 #define XBEE_START_BYTE 0xBD
 #define PI 3.14159265359
 
@@ -50,6 +50,7 @@
 void *command_input(void *thread_id);
 void *control_stabilizer(void *thread_id);
 void *buffer_thread(void *thread_id);
+void *motor_signals(void *thread_id);
 void init(void);
 void start_motors(void);
 void stop_motors(void);
@@ -61,7 +62,7 @@ void set_desired_angles(Desired_angles& desired_angles);
 State state_error(const State& imu_data, const Desired_angles& desired_angles);
 Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
-void display_info(const State& imu_data, const State& error);
+void display_info(const State& imu_data, const State& error, const Control_command& U);
 void configure_threads(void);
 
 
