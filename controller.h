@@ -1,7 +1,7 @@
 //=================================
 // include guard
-#ifndef MOTOR_TEST_H
-#define MOTOR_TEST_H
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
 
 //=================================
 // included dependencies
@@ -67,4 +67,4 @@ void configure_threads(void);
 
 
 #endif 
-// __MOTOR_TEST_H_INCLUDED__
+// __CONTROLLER_H_INCLUDED__
