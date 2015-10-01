@@ -1,26 +1,30 @@
 //=================================
 // include guard
-#ifndef MOTOR_TEST_H
-#define MOTOR_TEST_H
+#ifndef VICON_H
+#define VICON_H
 
 //=================================
 // included dependencie
+// #include "imu.h"
+// #include "motor.h"
+#include "data_structs.h" // user defined structs (state, control_command,gains, desired_angles)
+#include "concur_data.h"  //process communcation class
+//
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
+   #include <linux/i2c.h>
+   #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
 #include "receiver.h"
 #include <math.h>
-#include "serial1.h"
-#include "Xbee.h"
+   #include "serial1.h"
+   #include "Xbee.h"
 
-#include "imu.h"
-#include "motor.h"
+#include <curses.h> //for getch()
 
 //=================================
 // forward declared dependencies
@@ -47,6 +51,21 @@
 #define STAT_TIME               0x20
 #define STAT_INVALID            0x40
 #define STAT_EYE                0x80
-#define DISTANCE_CONT		0x8f
+#define DISTANCE_CONT		    0x8f
 
-#define NUM_THREADS 4
+void *vicon_input(void *thread_id);
+void get_data(const int port, Vicon& vicon_data);
+void unpack_data(Vicon& vicon_data, const unsigned char arr[]);
+void time_calc(Times& times);
+void set_desired_positions(Positions& desired_positions);
+void set_start(Positions& START);
+void set_initial_times(Times& times);
+void configure_threads(void);
+void display_info(const Vicon& vicon_data);
+void init(void);
+int main(void);
+
+
+
+#endif 
+// __VICON_H_INCLUDED__
