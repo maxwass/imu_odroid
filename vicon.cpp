@@ -3,9 +3,7 @@
 int onesecond = 1000000;
 
 Positions desired_positions;
-
 Positions START;
-
 Times times;
 
 
@@ -15,9 +13,7 @@ int usb_xbee;
 int bytes_from_vicon = 16;//how many bytes from vicon????
 
 //this is ALSO IN CONTROLLER.CPP
-concur_data<State> state_from_vicon(VICON_MEM_LOC, "vicon");
-
- 
+//concur_data<State> state_from_vicon(VICON_MEM_LOC, "vicon");
 
 
 void *vicon_input(void *thread_id){
@@ -32,7 +28,6 @@ void *vicon_input(void *thread_id){
 
 		display_info(vicon_data);
 	}
-
 
 }
 
@@ -73,8 +68,6 @@ void unpack_data(Vicon& vicon_data, const unsigned char arr[]){
 	vicon_data.phi = *(float *)&arr[12];
 	vicon_data.theta = *(float *)&arr[16];
 	vicon_data.psi =  *(float *)&arr[20];
-
-		//ORDERING IS WRONG!!!
 
 	//cout << "exit unpack_data" << endl;
 }
