@@ -54,7 +54,7 @@
 #define DISTANCE_CONT		    0x8f
 
 void *vicon_input(void *thread_id);
-void get_data(const int port, Vicon& vicon_data);
+void get_vicon_data(const int port, Vicon& vicon_data);
 void unpack_data(Vicon& vicon_data, uint8_t arr[]);
 void time_calc(Times& times);
 void set_initial_times(Times& times);

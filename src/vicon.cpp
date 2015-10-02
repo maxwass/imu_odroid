@@ -1,4 +1,4 @@
-#include "../include/vicon.h"
+#include "vicon.h"
 
 //compilation requres -pthread option
 int onesecond = 1000000;
@@ -17,7 +17,7 @@ void *vicon_input(void *thread_id){
 
 	while(1){
 
-		get_data(usb_xbee, vicon_data);
+		get_vicon_data(usb_xbee, vicon_data);
 
 		//state_from_vicon.update(raw_vicon_xbee);
 		
@@ -27,9 +27,9 @@ void *vicon_input(void *thread_id){
   pthread_exit(NULL);
 }
 
-void get_data(int port, Vicon& vicon_data)
+void get_vicon_data(int port, Vicon& vicon_data)
 {
-    //cout << "entering get_data" << endl;
+    //cout << "entering get_vicon_vicon_data" << endl;
     
     uint8_t raw_vicon_xbee[num_bytes_from_vicon];// = {0};
 
@@ -43,7 +43,7 @@ void get_data(int port, Vicon& vicon_data)
     cout << "number of bytes read into sensor_bytes: " << result << endl;
     
     //For error message
-    if (result == -1){  printf("get_data: FAILED read from port \n");}
+    if (result == -1){  printf("get_vicon_data: FAILED read from port \n");}
     
     //read first byte and check it
     uint8_t first_byte_recieved = raw_vicon_xbee[0];
@@ -56,7 +56,7 @@ void get_data(int port, Vicon& vicon_data)
 	tcflush(port, TCIFLUSH);
     	int result = read(port, &raw_vicon_xbee[0], num_bytes_from_vicon);
    	cout << "number of bytes read into sensor_bytes: " << result << endl;
-    	if (result == -1){  printf("get_data: FAILED read from port \n");}
+    	if (result == -1){  printf("get_vicon_data: FAILED read from port \n");}
     	//read first byte and check it
     	uint8_t first_byte_recieved = raw_vicon_xbee[0];
         
@@ -74,7 +74,7 @@ void get_data(int port, Vicon& vicon_data)
 
     unpack_data(vicon_data, raw_vicon_xbee);
     
-   // cout << "exit get_data" << endl;
+   // cout << "exit get_vicon_data" << endl;
     
 }
 void unpack_data(Vicon& vicon_data, uint8_t arr[]){

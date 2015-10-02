@@ -1,4 +1,4 @@
-#include "../include/motor.h"
+#include "motor.h"
 
 #define MOTOR_PATH "/dev/i2c-4"
 

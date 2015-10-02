@@ -12,7 +12,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <unistd.h>
-
+#include <stdint.h>
 
 using namespace std;
 

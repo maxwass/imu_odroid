@@ -33,7 +33,7 @@ double kp_theta, kd_theta, kp_phi, kd_phi, kp_psi, kd_psi;
 } Gains; 
 
 typedef struct times {
-timeval current, prev, prev_2, delta;
+struct timeval current, prev, prev_2, delta;
 } Times; 
 
 

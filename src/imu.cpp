@@ -5,7 +5,7 @@
 //  Created by Max Wasserman on 9/7/15.
 //
 //
-#include "../include/imu.h"
+#include "imu.h"
 
 int open_port()
 {

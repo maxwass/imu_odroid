@@ -4,7 +4,9 @@
 #define IMU_H
 
 //=================================
-// included dependencies
+// included dependenciesa
+#include "data_structs.h"
+
 #include <iostream>
 #include <stdio.h>   /* Standard input/output definitions */
 #include <iostream>
@@ -15,16 +17,15 @@
 #include <fcntl.h>   /* File control definitions */
 #include <termios.h> /* POSIX terminal control definitions, Unix API for terminal I/O */
 
-
 #define BAUDRATE B115200
 #define MY_PATH "/dev/ttySAC0"
 
 
 //=================================
 //local data structures
-typedef struct state {
-    float theta, phi, psi, theta_dot, phi_dot, psi_dot;
-} State ;
+//typedef struct state {
+//    float theta, phi, psi, theta_dot, phi_dot, psi_dot;
+//} State ;
  
 using namespace std;
 
