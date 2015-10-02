@@ -20,13 +20,6 @@
 #define BAUDRATE B115200
 #define MY_PATH "/dev/ttySAC0"
 
-
-//=================================
-//local data structures
-//typedef struct state {
-//    float theta, phi, psi, theta_dot, phi_dot, psi_dot;
-//} State ;
- 
 using namespace std;
 
 //function prototypes
