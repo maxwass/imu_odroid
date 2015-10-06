@@ -7,8 +7,8 @@
 // included dependencie
 #include "data_structs.h" // user defined structs (state, control_command,gains, desired_angles)
 //#include "shared_data.hpp"  //uncomment when implemented
-#include "Xbee.h"
-#include "receiver.h"
+//#include "Xbee.h"
+//#include "receiver.h"
 
 #include <pthread.h>
 #include <termios.h>
@@ -34,6 +34,7 @@
 //#define XBEE_START_BYTE 0xFD
 #define PI 3.14159265359
 #define BAUDRATE B115200
+#define XBEE_START_BYTE 0xFD
 
 #define LIDAR_LITE_ADRS 0x62
 #define MEASURE_VAL 0x04
@@ -54,9 +55,11 @@
 #define STAT_EYE                0x80
 #define DISTANCE_CONT		    0x8f
 
-void get_vicon_data(const int port, Vicon& vicon_data);
+void get_vicon_data(int port, Vicon& vicon_data);
 void unpack_data(Vicon& vicon_data, float arr[]);
-void display_info(const Vicon& vicon_data);
+void display_vicon_data(const Vicon& vicon_data);
+int open_vicon_port();
+int recieve_data(int fd_xbee, float data_received[], int data_size);
 void init(void);
 int main(void);
 

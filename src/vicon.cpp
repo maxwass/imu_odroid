@@ -1,9 +1,7 @@
 #include "vicon.h"
-
 //compilation requres -pthread option
-int onesecond = 1000000;
 
-int usb_xbee;
+int usb_xbee_fd;
 int num_bytes_per_read=2;
 
 using namespace std;
@@ -17,7 +15,7 @@ void get_vicon_data(int port, Vicon& vicon_data)
  
     float data_received[6];
 
-    XBee_receive_float(usb_xbee, data_received,6);
+    recieve_data(usb_xbee_fd, data_received,6);
     unpack_data(vicon_data, data_received);
     
    // cout << "exit get_vicon_data" << endl;
@@ -29,23 +27,23 @@ void unpack_data(Vicon& vicon_data, float arr[]){
     //the cast to a float pointer takes the first four bytes in the array 'arr',
     //thus constructing a float
     
-	cout << "enter unpack_data" << endl;
+//	cout << "enter unpack_data" << endl;
 	vicon_data.x =     arr[0];
         vicon_data.y =     arr[1];
         vicon_data.z =     arr[2];
         vicon_data.phi =   arr[3];
         vicon_data.theta = arr[4];
         vicon_data.psi =   arr[5];
-	cout << "exit unpack_data" << endl;
+//	cout << "exit unpack_data" << endl;
 }
-void display_info(const Vicon& vicon_data) {
+void display_vicon_data(const Vicon& vicon_data) {
         printf("<==========================================>\n");   	
        	printf("    VICON DATA    \n");
         printf("phi: %.2f         x: %.2f\n",    vicon_data.phi  ,  vicon_data.x);
         printf("theta: %.2f       y: %.2f\n",    vicon_data.theta,  vicon_data.y);
         printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi  ,  vicon_data.z);
 }
-int open_port()
+int open_vicon_port()
 {
     //port = open(path, O_RDWR | O_NOCTTY)
     //port        - The returned file handle for the device. -1 if an error occurred
@@ -107,13 +105,90 @@ int open_port()
     }
     return port;
 }
-void init(void){
 
-     usb_xbee = open_port();
+int recieve_data(int fd_xbee, float data_received[], int data_size)
+{
+
+    int bytes_received, attempts, i;
+    int MAXATTEMPTS=100;
+    uint8_t recv_byte;
+    uint8_t recv_buffer[sizeof(float)*data_size+3]; // 1 start byte + data + 2 checksum
+    fd_set readfs;
+    uint16_t checksum_recv, checksum_calc=0;
+
+    FD_ZERO(&readfs);
+    FD_SET(fd_xbee, &readfs);
+
+
+    // wait for data
+    select(fd_xbee+1, &readfs, NULL, NULL, NULL);
+
+    // check the start byte
+    read(fd_xbee,&recv_byte,1);
+
+    if(recv_byte==XBEE_START_BYTE)
+    {
+        // correct start byte
+
+        bytes_received=0;
+        attempts=0;
+
+        recv_buffer[bytes_received]=recv_byte;
+        bytes_received+=1;
+
+        // receive data
+        while(bytes_received < (sizeof(float)*data_size)+3 && attempts++ < MAXATTEMPTS)
+        {
+            if(read(fd_xbee,&recv_byte,1)==1)
+            {
+                recv_buffer[bytes_received]=recv_byte;
+                bytes_received+=1;
+            }
+            else
+            {
+                usleep(1000);
+            }
+
+        }
+
+        // Checksum: sum of data without start byte (two bytes: rolls over at 65536)
+        for(i=1;i<sizeof(float)*data_size+1;i++)
+        {
+            checksum_calc+=recv_buffer[i];
+        }
+        checksum_recv=recv_buffer[sizeof(float)*data_size+1] << 8 | recv_buffer[sizeof(float)*data_size+2]; // high << 8 | low
+
+        if(checksum_recv == checksum_calc)
+        {
+         // correct checksum
+	// convert data to float
+        for(i=0;i<data_size;i++) { data_received[i]=*(float *)&recv_buffer[sizeof(float)*i+1]; }
+            return bytes_received;
+        }
+        else
+        {
+            // incorrect checksum
+            printf("checksum_calc:%d, checksum_recv:%d\n",checksum_calc,checksum_recv);
+            return -2;
+       	}
+    }
+   else
+    {  	// incorrect start byte
+        return -1;
+    }
+
+ tcflush(fd_xbee,TCIOFLUSH);
+
 }
+
+void vicon_init(void){
+
+     usb_xbee_fd = open_vicon_port();
+}
+/*
 int main(void){
 
-    init();
+   vicon_init();
 
   //  usleep(onesecond);
 
@@ -122,11 +197,11 @@ int main(void){
     while(1){
 
   	    cout << "before get_vicon_data" << endl;
-            get_vicon_data(usb_xbee, vicon_data);
+            get_vicon_data(usb_xbee_fd, vicon_data);
 
             //vicon.update(vicon_data); //UNCOMMENT WHEN IMPLEMENTED
   
-            display_info(vicon_data);
+            display_vicon_data(vicon_data);
      }
 
     return 0;
@@ -134,4 +209,4 @@ int main(void){
 }
 
 
-
+*/

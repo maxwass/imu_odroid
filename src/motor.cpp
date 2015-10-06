@@ -1,5 +1,5 @@
 #include "motor.h"
-
+//need sudo to run exec
 #define MOTOR_PATH "/dev/i2c-4"
 
 int motor::open_i2c(void){
@@ -66,7 +66,7 @@ void motor::send_force_i2c(void){
     int success_write = write(i2c_handle, &force, 1);//add &force back
 
     if(success_write < 0) {
-        cout << "Failed to write to motor" << motor_id << endl;
+        cout << "Failed to write to motor: " << motor_id << endl;
     }
 
 }

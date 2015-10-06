@@ -6,6 +6,7 @@
 //=================================
 // included dependenciesa
 #include "data_structs.h"
+//#include "shared_data.hpp" //UNCOMMENT WHEN IMPLEMENTED
 
 #include <iostream>
 #include <stdio.h>   /* Standard input/output definitions */
@@ -23,10 +24,10 @@
 using namespace std;
 
 //function prototypes
-int open_port(void);
+int open_imu_port(void);
 void print_data(const State& imu_data);
 void unpack_data(State& imu_data, const unsigned char arr[]);
-void get_data(const int port, State& imu_data);
+void get_imu_data(const int port, State& imu_data);
 
 
 #endif

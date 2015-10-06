@@ -1,15 +1,19 @@
 #include "controller.h"
 // compiling: g++ controller.cpp -I ~/Desktop/quadrotor/imu_odroid/include/
-//g++ controller.cpp motor.cpp imu.cpp -I ~/Desktop/quadrotor/imu_odroid/include/ -lpthread
+//g++ controller.cpp vicon.cpp motor.cpp imu.cpp -I ~/Desktop/quadrotor/imu_odroid/include/ -lpthread
+
+//initialize process-scoped data-structures
 Times times;
 Positions init_positions;
 Positions desired_positions;
+Gains gains;
+Control_command U_trim;
 
 bool SYSTEM_RUN = true;
 bool CONTROLLER_RUN = true;
 bool DISPLAY_RUN = false;
 
-int i2cHandle, usb_imu, res1;
+int i2cHandle, usb_imu, usb_xbee, res1;
 
 double Ct=0.013257116418667*10;
 double d=0.169;
@@ -25,11 +29,6 @@ int delta_thrust = 30;
 //The address of i2c
 int address[4] = {0x2b, 0x2a, 0x2c, 0x29};
 
-//initialize process-scoped data-structures
-Angles desired_angles;
-Gains gains;
-Control_command U_trim;
-
 //create our motor objects - accesible from all threads
 motor motor_1(1, address[0]);
 motor motor_2(2, address[1]);
@@ -39,6 +38,10 @@ motor motor_4(4, address[3]);
 //this object is where the raw vicon data is being held, must access
   //it through this interface (2 methods: update and retrieve )
 //concur_data<State> state_from_vicon(VICON_MEM_LOC, "vicon");
+//shared_data<Vicon> vicon("v_mem_loc",VICON,"open");
+//shared_data<State> imu("imu_mem_loc",IMU,"open");
+//shared_data<Angles> des_angles("ang_mem_loc",DES_ANGLE. "create");
+
 
 //executes input from host computer on motors, controller gains, displays, and controller
 void *command_input(void *thread_id){
@@ -47,8 +50,9 @@ void *command_input(void *thread_id){
 
     while(SYSTEM_RUN) {
 	      cout <<"    please give input for command_input: " << endl; 
-	      unsigned char command = get_terminal_input();
-        
+	      unsigned char command= get_terminal_input();
+              //cin >> command;
+	      cout << endl;
 	 switch (command) {
             case '1':
             case '2':
@@ -77,18 +81,19 @@ void *command_input(void *thread_id){
                 
             case 'c':
             case 'C':
-		            U_trim.thrust = U_trim.thrust + delta_thrust;
+                U_trim.thrust = U_trim.thrust + delta_thrust;
                 if(U_trim.thrust > max_thrust) {
                   printf("Maximum Thrust Reached: Cannot Increase Thrust\n");
                   U_trim.thrust = max_thrust;}
                 else {printf("Increase Thrust\n");}
-		            cout << U_trim.thrust << endl;
-		            break;
+		      cout << U_trim.thrust << endl;
+		       break;
                 
             case 'd':
             case 'D':
                 printf("Decrease Thrust!\n");
                 U_trim.thrust = U_trim.thrust - delta_thrust;
+                cout << U_trim.thrust << endl;
                 break;
                 
             case 'e':
@@ -121,66 +126,46 @@ void *command_input(void *thread_id){
                 
             case 'i':
             case 'I':
-                printf("Increase theta_d ('theta desired') \n");
-                desired_angles.theta = desired_angles.theta + 1.0;
-                break;
-                
-            case 'j':
-            case 'J':
-                printf("Decrease theta_d ('theta desired') \n");
-                desired_angles.theta = desired_angles.theta - 1.0;
-                break;
-                
-            case 'k':
-            case 'K':
-                printf("Increase phi_d ('phi desired') \n");
-                desired_angles.phi = desired_angles.phi + 1.0;
-                break;
-                
-            case 'l':
-            case 'L':
-                printf("Decrease phi_d ('phi desired') \n");
-                desired_angles.phi = desired_angles.phi - 1.0;
-                break;
-
-            case 'm':
-            case 'M':
-              printf("Reset Desired_positions to START\n");
+              printf("Reset Desired_positions to initial values\n");
               desired_positions.x = init_positions.x;
               desired_positions.y = init_positions.y;
               desired_positions.z = init_positions.z;
               break;
 
-            case 'n':
-            case 'N':
+            case 'j':
+            case 'J':
+	      printf("Increase X desired_positions\n");
+              desired_positions.x = desired_positions.x - delta_position;
+              break;
               break;
 
-            case 'o':
-            case 'O':
+            case 'k':
+            case 'K':
               printf("Decrease X desired_positions\n");
               desired_positions.x = desired_positions.x - delta_position;
               break;
-            case 'p':
-            case 'P':
+
+            case 'l':
+            case 'L':
               printf("Increase Y desired_positions\n");
               desired_positions.y = desired_positions.y + delta_position;
               break;
 
               // skip q/Q - this is quit
-            case 'r':
-            case 'R':
+            case 'm':
+            case 'M':
               printf("Decrease Y desired_positions\n");
               desired_positions.y = desired_positions.y - delta_position;
               break;
 
-            case 's':
-            case 'S':
+            case 'n':
+            case 'N':
               printf("Increase Z desired_positions\n");
               desired_positions.z = desired_positions.z + delta_position;
               break;
 
-            case 't':
-            case 'T':
+            case 'o':
+            case 'O':
               printf("Decrease Z desired_positions\n");
               desired_positions.z = desired_positions.z - delta_position;
               break;
@@ -202,13 +187,20 @@ void *control_stabilizer(void *thread_id){
     cout << "INSIDE CONTROL_STABALIZER" << endl;
 
     State imu_data; 
+    Vicon vicon_data;
 
     while(SYSTEM_RUN) {
 
-	      //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
-	      get_data(usb_imu, imu_data);
-
-        //calculate error (in radians) between desired and measured state
+	 //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
+	get_imu_data(usb_imu, imu_data);
+	//imu.retrieve(imu_data); //delete line above once implemented
+       
+	//get vicon data
+	get_vicon_data(usb_xbee, vicon_data);
+	//calculate desired attitude (phi theta phi)
+	Angles desired_angles = angles(vicon_data,desired_positions);
+	
+	 //calculate error (in radians) between desired and measured state
         State error = state_error(imu_data, desired_angles);
         
         //calculate thrust and desired acceleration
@@ -216,15 +208,25 @@ void *control_stabilizer(void *thread_id){
 
    	    //calculate the forces of each motor and change force on motor objects
          // and send via i2c
-        set_forces(U,Ct,d);
+        //set_forces(U,Ct,d);
 
-	 if(DISPLAY_RUN) { display_info(imu_data, error, U); }
+	 if(DISPLAY_RUN) { display_info(imu_data, error, U, vicon_data); }
 
     }
   
     cout << "EXIT CONTROL_STABILIZER" << endl;
 
     pthread_exit(NULL);
+}
+Angles angles(const Vicon& vicon_data, const Positions& desired_positions){
+
+Angles a;
+
+a.theta = 0;
+a.phi   = 0;
+a.psi   = 0;
+return a;
+
 }
 void *motor_signal(void *thread_id){
 
@@ -247,13 +249,18 @@ void *motor_signal(void *thread_id){
 void init(void){
 
     printf("opening usb port for imu...\n");
-    usb_imu = open_port();
+    usb_imu = open_imu_port();
      if (usb_imu > 0)
         printf("Done!\n");
      else
         printf("Fail to open usb port!\n");
 
-    set_desired_angles(desired_angles);
+    printf("opening usb port for vicon...\n");
+    usb_xbee = open_vicon_port();
+     if (usb_xbee > 0)
+        printf("Done!\n");
+     else
+        printf("Fail to open vicon xbee port!\n");
     set_gains(gains);
     set_Utrim(U_trim);
     set_initial_times(times);
@@ -310,11 +317,6 @@ void set_gains(Gains& gains){
     
     gains.kp_psi = 5.2;
     gains.kd_psi = 0.3;  
-}
-void set_desired_angles(Angles& desired_angles){
-    desired_angles.theta = 0.0;
-    desired_angles.phi   = 0.0;
-    desired_angles.psi   = 0.0;
 }
 void set_initial_times(Times& times){
         gettimeofday(&(times.current),NULL);
@@ -426,13 +428,18 @@ char get_terminal_input(void)
     tcsetattr( STDIN_FILENO, TCSANOW, &oldattr );
     return (char) ch;
 }
-void display_info(const State& imu_data, const State& error, const Control_command& U ){
+void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon_data){
         printf("<==========================================>\n");   	
 	      printf("Controller ON \n");
        	printf("    IMU DATA    \n");
         printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
+
+	printf("    VICON DATA    \n");
+        printf("phi: %.2f         x: %.2f\n", vicon_data.phi, vicon_data.x);
+        printf("theta: %.2f       y: %.2f\n",vicon_data.theta, vicon_data.y);
+        printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi, vicon_data.z);
 
        // printf("    GAINS       \n");
        // printf("kp_phi: %f  kd_phi: %f\n",gains.kp_phi, gains.kd_phi);

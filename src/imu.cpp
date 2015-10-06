@@ -7,7 +7,9 @@
 //
 #include "imu.h"
 
-int open_port()
+//shared_data<State> imu("imu_mem_loc",IMU,"create");
+
+int open_imu_port()
 {
     //port = open(path, O_RDWR | O_NOCTTY)
     //port        - The returned file handle for the device. -1 if an error occurred
@@ -99,9 +101,9 @@ void unpack_data(State& imu_data, const unsigned char arr[]){
 	//cout << "exit unpack_data" << endl;
 }
 
-void get_data(const int port, State& imu_data)
+void get_imu_data(const int port, State& imu_data)
 {
-    //cout << "entering get_data" << endl;
+    //cout << "entering get_imu_data" << endl;
     
     unsigned char sensor_bytes2[24] = {0};
     
@@ -115,11 +117,11 @@ void get_data(const int port, State& imu_data)
     //cout << "number of bytes read into sensor_bytes: " << result << endl;
 
     //For error message
-    if (result == -1){  printf("get_data: FAILED read from port \n");}
+    if (result == -1){  printf("get_imu_data: FAILED read from port \n");}
 
     unpack_data(imu_data, sensor_bytes2);
     
-   // cout << "exit get_data" << endl;
+   // cout << "exit get_imu_data" << endl;
     
 }
 
@@ -129,13 +131,14 @@ void get_data(const int port, State& imu_data)
 int main (void)
 {
     // File descriptor for the port 
-    int port = open_port();
+    int port = open_imu_port();
     //instantiate imu_data ==> scope is over while loop. Same imu_data will be overwritten repeatedly
     State imu_data;
     while(1)
     {   //pull data from sensor and put into imu_data
-        get_data(port, imu_data);
+        get_imu_data(port, imu_data);
         //print_data(imu_data);
+	//imu.update(imu_data);  //UNCOMMENT THIS WHEN IMPLEMENTED
     }
     
     
