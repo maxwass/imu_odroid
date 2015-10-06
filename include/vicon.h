@@ -6,7 +6,9 @@
 //=================================
 // included dependencie
 #include "data_structs.h" // user defined structs (state, control_command,gains, desired_angles)
-//#include "concur_data.h"  //process communcation class
+//#include "shared_data.hpp"  //uncomment when implemented
+#include "Xbee.h"
+#include "receiver.h"
 
 #include <pthread.h>
 #include <termios.h>
@@ -21,7 +23,6 @@
 #include <stdio.h>
 #include <math.h>
   // #include "serial1.h"
-//#include "Xbee.h"
 #include <sys/time.h>
 #include <time.h>
 #include <iostream>
@@ -53,12 +54,8 @@
 #define STAT_EYE                0x80
 #define DISTANCE_CONT		    0x8f
 
-void *vicon_input(void *thread_id);
 void get_vicon_data(const int port, Vicon& vicon_data);
-void unpack_data(Vicon& vicon_data, uint8_t arr[]);
-void time_calc(Times& times);
-void set_initial_times(Times& times);
-void configure_threads(void);
+void unpack_data(Vicon& vicon_data, float arr[]);
 void display_info(const Vicon& vicon_data);
 void init(void);
 int main(void);

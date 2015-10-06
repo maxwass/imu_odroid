@@ -3,6 +3,14 @@
 
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <termios.h>
+#include <iostream>
+#include <string.h>  /* String function definitions */
+#include <unistd.h>  /* UNIX standard function definitions */
+#include <fcntl.h>   /* File control definitions */
+#include <errno.h>   /* Error number definitions */
+
 #define XBEE_START_BYTE 0xFD
 
 int XBee_send_float(int fd_xbee, float data[], int data_size)
