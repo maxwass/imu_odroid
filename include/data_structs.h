@@ -36,6 +36,9 @@ typedef struct times {
 struct timeval current, prev, prev_2, delta;
 } Times; 
 
+typedef struct weights {
+float newest, old, old_old;
+} Weights;
 
 
 #endif
