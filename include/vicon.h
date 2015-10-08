@@ -56,6 +56,9 @@
 #define DISTANCE_CONT		    0x8f
 
 void get_vicon_data(int port, Vicon& vicon_data);
+Vicon filter_vicon_data(Vicon& new_v, Vicon& prev1_v, Vicon& prev2_v,Weights& weights);
+float filt(float new_data, float old_data, float old_old_data, Weights& weights);
+void pushback(Vicon& new_vicon, Vicon& old_vicon, Vicon& old_old_Vicon); 
 void unpack_data(Vicon& vicon_data, float arr[]);
 void display_vicon_data(const Vicon& vicon_data);
 int open_vicon_port();

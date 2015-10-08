@@ -11,15 +11,66 @@ using namespace std;
 
 void get_vicon_data(int port, Vicon& vicon_data)
 {
-    //cout << "entering get_vicon_vicon_data" << endl;
- 
+     //cout << "entering get_vicon_vicon_data" << endl;
     float data_received[6];
-
     recieve_data(port, data_received,6);
     unpack_data(vicon_data, data_received);
+     // cout << "exit get_vicon_data" << endl;
     
-   // cout << "exit get_vicon_data" << endl;
+}
+Vicon filter_vicon_data(Vicon& new_vicon, Vicon& old_vicon, Vicon& old_old_vicon ,Weights& weights){
+    //cout << "filtering vicon data" << endl;
+
+    Vicon filt_vicon = {0.0};
+
+    //filt_vicon.x = (weights.newest * new_vicon.x) + (weights.old * old_vicon.x) + (weights.old_old * old_old_vicon.x);
+    filt_vicon.x = filt(new_vicon.x, old_vicon.x, old_old_vicon.x, weights);
+    filt_vicon.y = filt(new_vicon.y, old_vicon.y, old_old_vicon.y, weights);
+    filt_vicon.z = filt(new_vicon.z, old_vicon.z, old_old_vicon.z, weights);
+    filt_vicon.theta = filt(new_vicon.theta, old_vicon.theta, old_old_vicon.theta, weights);
+    filt_vicon.phi = filt(new_vicon.phi, old_vicon.phi, old_old_vicon.phi, weights);
+    filt_vicon.psi = filt(new_vicon.psi, old_vicon.psi, old_old_vicon.psi, weights);
     
+    /*
+    cout << "new_vicon.x: " << new_vicon.x << endl;
+    cout << "old_vicon.x: " << old_vicon.x << endl;
+    cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
+    cout << "filt_vicon.x: " << filt_vicon.x << endl;
+    
+    cout << endl;
+     
+    cout << "new_vicon.theta: " << new_vicon.theta << endl;
+    cout << "old_vicon.theta: " << old_vicon.theta << endl;
+    cout << "old_old_vicon.theta: " << old_old_vicon.theta << endl;
+    cout << "filt_vicon.theta: " << filt_vicon.theta << endl;
+
+    
+    cout << endl;
+    */
+}
+float filt(float new_data, float old_data, float old_old_data, Weights& weights){
+    float f = (weights.newest * new_data) + (weights.old * old_data) + (weights.old_old * old_old_data);
+    return f;
+}
+void pushback(Vicon& new_vicon, Vicon& old_vicon, Vicon& old_old_vicon){
+    cout << endl;
+    cout << "IN PUSHBACK" << endl;    
+    cout << "old_vicon.x: " << old_vicon.x << endl;
+    cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
+    cout << "   assign old_old_vicon = old_vicon " << endl;
+    
+    old_old_vicon = old_vicon;
+    cout << "old_vicon.x: " << old_vicon.x << endl;
+    cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
+
+    cout << "   assign old_vicon = new_vicon " << endl;
+    old_vicon = new_vicon;
+    cout << "new_vicon.x: " << new_vicon.x << endl;
+    cout << "old_vicon.x: " << old_vicon.x << endl;
+    cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
+    cout << "EXIT PUSHBACK" << endl; 
+    cout << endl;
+
 }
 void unpack_data(Vicon& vicon_data, float arr[]){
     //distributes data from the input buffer to the imu_data data structure
@@ -190,9 +241,7 @@ int main(void){
 
    vicon_init();
 
-  //  usleep(onesecond);
-
-    Vicon vicon_data;
+   Vicon vicon_data;
 
     while(1){
 
