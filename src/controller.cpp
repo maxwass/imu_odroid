@@ -49,11 +49,10 @@ void *command_input(void *thread_id){
     unsigned char command;
 
     while(SYSTEM_RUN) {
-	      cout <<"    please give input for command_input: " << endl; 
-	      command = getchar(); //_terminal_input();
-         // cin >> command;
-	      cout << endl;
-	 switch (command) {
+	    cout <<"    please give input for command_input: ";// << endl; 
+	    command = getchar(); 
+        cout << endl;
+        switch (command) {
             case '1':
             case '2':
             case '3':
@@ -77,6 +76,7 @@ void *command_input(void *thread_id){
             case 'b':
             case 'B':
                 display_on_off(DISPLAY_RUN);
+                system("clear");
                 break;
                 
             case 'c':
@@ -187,33 +187,40 @@ void *control_stabilizer(void *thread_id){
     cout << "INSIDE CONTROL_STABALIZER" << endl;
 
     State imu_data; 
-    Vicon vicon_data;
-
-
-    /*
-    get_vicon_data(usb_xbee, vicon_data);
-
-
-    cout << "VICON DATA " << endl;
-         printf("phi: %.2f         x: %.2f\n", vicon_data.phi, vicon_data.x);
-         printf("theta: %.2f       y: %.2f\n",vicon_data.theta, vicon_data.y);
-         printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi, vicon_data.z);
-   */
+    Vicon new_vicon, old_vicon, old_old_vicon = {0.0};
+    //weights is used for filter: current, one value ago, 2 values ago
+    Weights weights = {.7,.2,.1};
 
 
     while(SYSTEM_RUN) {
        // cout << "1" << endl;
     	 //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
-    //	get_imu_data(usb_imu, imu_data);
+       
+         //get_imu_data(usb_imu, imu_data);
     	//imu.retrieve(imu_data); //delete line above once implemented
         // cout << "2" << endl;
     	
     	//get vicon data
-	    get_vicon_data(usb_xbee, vicon_data);
+	    get_vicon_data(usb_xbee, new_vicon);
+
+        //filter vicon data
+        Vicon filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
+        cout << "READ NEW DATA" << endl;
+        cout << "new_vicon.x" << new_vicon.x << endl;
+        cout << "old_vicon.x" << old_vicon.x << endl;
+        cout << "old_old_vicon.x" << old_old_vicon.x << endl; 
+
+
+        pushback(new_vicon,old_vicon,old_old_vicon);
        // cout << "3" << endl;
-    	
+    
+        cout << "new_vicon.x" << new_vicon.x << endl;
+        cout << "old_vicon.x" << old_vicon.x << endl;
+        cout << "old_old_vicon.x" << old_old_vicon.x << endl; 
+        cout << endl;
+
     	//calculate desired attitude (phi theta phi)
-    	Angles desired_angles = angles(vicon_data,desired_positions);
+    	Angles desired_angles = angles(filt_vicon,desired_positions);
 	   // cout << "4" << endl;
     	
 	     //calculate error (in radians) between desired and measured state
@@ -227,7 +234,7 @@ void *control_stabilizer(void *thread_id){
           //calculate the forces of each motor and change force on motor objects
           // and send via i2c 
           //set_forces(U,Ct,d);
-	 if(DISPLAY_RUN) { display_info(imu_data, error, U, vicon_data); }
+	 if(DISPLAY_RUN) { display_info(imu_data, error, U, new_vicon); }
 
     }
   
@@ -284,8 +291,6 @@ void init(void){
 
     // initialize shell 
   //  initscr();               /* Start curses mode        */
-    keypad(stdscr, TRUE);    /* We get F1, F2 etc..      */
-    noecho();                /* Don't echo() while we do getch */
     struct termios oldattr, newattr;
     tcgetattr( STDIN_FILENO, &oldattr );
     newattr = oldattr;
