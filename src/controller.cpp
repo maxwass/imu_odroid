@@ -1,6 +1,6 @@
 #include "controller.h"
 // compiling: g++ controller.cpp -I ~/Desktop/quadrotor/imu_odroid/include/
-//g++ controller.cpp vicon.cpp motor.cpp imu.cpp -I ~/Desktop/quadrotor/imu_odroid/include/ -lpthread
+//g++ controller.cpp vicon.cpp motor.cpp imu.cpp -I ~/Desktop/quadrotor/imu_odroid/include/ -lpthread -lcurses
 
 //initialize process-scoped data-structures
 Times times;
@@ -11,7 +11,7 @@ Control_command U_trim;
 
 bool SYSTEM_RUN = true;
 bool CONTROLLER_RUN = true;
-bool DISPLAY_RUN = false;
+bool DISPLAY_RUN = true;
 
 int i2cHandle, usb_imu, usb_xbee, res1;
 
@@ -45,12 +45,12 @@ motor motor_4(4, address[3]);
 
 //executes input from host computer on motors, controller gains, displays, and controller
 void *command_input(void *thread_id){
-
+//initscr();
     cout << "INSIDE COMMAND_INPUT" << endl;
 
     while(SYSTEM_RUN) {
 	      cout <<"    please give input for command_input: " << endl; 
-	      unsigned char command= get_terminal_input();
+	      unsigned char command = get_terminal_input();
               //cin >> command;
 	      cout << endl;
 	 switch (command) {
@@ -134,7 +134,7 @@ void *command_input(void *thread_id){
 
             case 'j':
             case 'J':
-	      printf("Increase X desired_positions\n");
+	          printf("Increase X desired_positions\n");
               desired_positions.x = desired_positions.x - delta_position;
               break;
               break;
@@ -172,7 +172,7 @@ void *command_input(void *thread_id){
 
             case ' ':
             case '\n':
-              printf("Control Landing: Not Implemented\n");
+            //  printf("Control Landing: Not Implemented\n");
               //t_landing = t;
               //CTRL_LANDING = true;
               break;
@@ -190,26 +190,32 @@ void *control_stabilizer(void *thread_id){
     Vicon vicon_data;
 
     while(SYSTEM_RUN) {
-
-	 //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
-	get_imu_data(usb_imu, imu_data);
-	//imu.retrieve(imu_data); //delete line above once implemented
-       
-	//get vicon data
-	get_vicon_data(usb_xbee, vicon_data);
-	//calculate desired attitude (phi theta phi)
-	Angles desired_angles = angles(vicon_data,desired_positions);
-	
-	 //calculate error (in radians) between desired and measured state
+        cout << "1" << endl;
+    	 //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
+    	get_imu_data(usb_imu, imu_data);
+    	//imu.retrieve(imu_data); //delete line above once implemented
+         cout << "2" << endl;
+    	
+    	//get vicon data
+	//    get_vicon_data(usb_xbee, vicon_data);
+          cout << "3" << endl;
+    	
+    	//calculate desired attitude (phi theta phi)
+    	Angles desired_angles = angles(vicon_data,desired_positions);
+	    cout << "4" << endl;
+    	
+	     //calculate error (in radians) between desired and measured state
         State error = state_error(imu_data, desired_angles);
-        
+          cout << "5" << endl;
+    	
         //calculate thrust and desired acceleration
         Control_command U = thrust(error, U_trim, gains);
-
-   	    //calculate the forces of each motor and change force on motor objects
-         // and send via i2c
-        //set_forces(U,Ct,d);
-
+         cout << "6" << endl;
+    	
+          //calculate the forces of each motor and change force on motor objects
+          // and send via i2c 
+          //set_forces(U,Ct,d);
+    cout << "ABOUT TO CALL DISPLAY INFO: " << endl;
 	 if(DISPLAY_RUN) { display_info(imu_data, error, U, vicon_data); }
 
     }
@@ -416,6 +422,7 @@ void set_forces(const Control_command& U, double Ct, double d){
 }
 //intializes the curses: getch()
 //initscr();
+/*
 char get_terminal_input(void)
 {//dissect and comment what is going on!
     struct termios oldattr, newattr;
@@ -428,7 +435,21 @@ char get_terminal_input(void)
     tcsetattr( STDIN_FILENO, TCSANOW, &oldattr );
     return (char) ch;
 }
+*/
+int get_terminal_input(void)
+{
+    struct termios oldattr, newattr;
+    int ch;
+    tcgetattr( STDIN_FILENO, &oldattr );
+    newattr = oldattr;
+    newattr.c_lflag &= ~( ICANON | ECHO );
+    tcsetattr( STDIN_FILENO, TCSANOW, &oldattr);
+    ch = getchar();
+    tcsetattr( STDIN_FILENO, TCSANOW, &oldattr );
+    return ch;
+}
 void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon_data){
+     cout << "IN DISPLAY_INFO" << endl;
         printf("<==========================================>\n");   	
 	      printf("Controller ON \n");
        	printf("    IMU DATA    \n");
@@ -472,7 +493,7 @@ void configure_threads(void){
     struct sched_param param;
     int fifo_max_prio, fifo_min_prio;
     
-     system("clear");
+    // system("clear");
 
      cout << "INSIDE CONFIGURE_THREADS" << endl;
     
@@ -499,7 +520,7 @@ void configure_threads(void){
      pthread_create(&threads[1], &attr, motor_signal, (void *) 1);
 
      cout << "=> creating command_input thread" << endl;
-     // Lower priority for vicon
+     // Lower priority for commmand input
      param.sched_priority = (fifo_max_prio+fifo_min_prio)/2;
      pthread_attr_setschedparam(&attr, &param);
      pthread_create(&threads[2], &attr, command_input, (void *) 2);

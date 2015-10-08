@@ -26,6 +26,7 @@
 //#include "receiver.h"
 #include <time.h>
 #include <sys/time.h>
+#include <curses.h>
 
 #define NUM_THREADS 3
 #define PI 3.14159265359
@@ -56,7 +57,7 @@ Angles angles(const Vicon& vicon_data, const Positions& desired_positions);
 State state_error(const State& imu_data, const Angles& desired_angles);
 Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
-char get_terminal_input(void);
+int get_terminal_input(void);
 void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon_data);
 void configure_threads(void);
 
