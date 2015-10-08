@@ -45,13 +45,13 @@ motor motor_4(4, address[3]);
 
 //executes input from host computer on motors, controller gains, displays, and controller
 void *command_input(void *thread_id){
-//initscr();
     cout << "INSIDE COMMAND_INPUT" << endl;
+    unsigned char command;
 
     while(SYSTEM_RUN) {
 	      cout <<"    please give input for command_input: " << endl; 
-	      unsigned char command = get_terminal_input();
-              //cin >> command;
+	      command = getchar(); //_terminal_input();
+         // cin >> command;
 	      cout << endl;
 	 switch (command) {
             case '1':
@@ -66,7 +66,7 @@ void *command_input(void *thread_id){
             case 'Q':
                 printf("Motor Stop!\n");
                 stop_motors();
-                CONTROLLER_RUN = false;
+                CONTROLLER_RUN = false;//change to System Run!
                 break;
                 
             case 'a':
@@ -171,7 +171,7 @@ void *command_input(void *thread_id){
               break;
 
             case ' ':
-            case '\n':
+           // case '\n':
             //  printf("Control Landing: Not Implemented\n");
               //t_landing = t;
               //CTRL_LANDING = true;
@@ -189,33 +189,44 @@ void *control_stabilizer(void *thread_id){
     State imu_data; 
     Vicon vicon_data;
 
+
+    /*
+    get_vicon_data(usb_xbee, vicon_data);
+
+
+    cout << "VICON DATA " << endl;
+         printf("phi: %.2f         x: %.2f\n", vicon_data.phi, vicon_data.x);
+         printf("theta: %.2f       y: %.2f\n",vicon_data.theta, vicon_data.y);
+         printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi, vicon_data.z);
+   */
+
+
     while(SYSTEM_RUN) {
-        cout << "1" << endl;
+       // cout << "1" << endl;
     	 //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
-    	get_imu_data(usb_imu, imu_data);
+    //	get_imu_data(usb_imu, imu_data);
     	//imu.retrieve(imu_data); //delete line above once implemented
-         cout << "2" << endl;
+        // cout << "2" << endl;
     	
     	//get vicon data
-	//    get_vicon_data(usb_xbee, vicon_data);
-          cout << "3" << endl;
+	    get_vicon_data(usb_xbee, vicon_data);
+       // cout << "3" << endl;
     	
     	//calculate desired attitude (phi theta phi)
     	Angles desired_angles = angles(vicon_data,desired_positions);
-	    cout << "4" << endl;
+	   // cout << "4" << endl;
     	
 	     //calculate error (in radians) between desired and measured state
         State error = state_error(imu_data, desired_angles);
-          cout << "5" << endl;
+         // cout << "5" << endl;
     	
         //calculate thrust and desired acceleration
         Control_command U = thrust(error, U_trim, gains);
-         cout << "6" << endl;
+         //cout << "6" << endl;
     	
           //calculate the forces of each motor and change force on motor objects
           // and send via i2c 
           //set_forces(U,Ct,d);
-    cout << "ABOUT TO CALL DISPLAY INFO: " << endl;
 	 if(DISPLAY_RUN) { display_info(imu_data, error, U, vicon_data); }
 
     }
@@ -270,6 +281,17 @@ void init(void){
     set_gains(gains);
     set_Utrim(U_trim);
     set_initial_times(times);
+
+    // initialize shell 
+  //  initscr();               /* Start curses mode        */
+    keypad(stdscr, TRUE);    /* We get F1, F2 etc..      */
+    noecho();                /* Don't echo() while we do getch */
+    struct termios oldattr, newattr;
+    tcgetattr( STDIN_FILENO, &oldattr );
+    newattr = oldattr;
+    newattr.c_lflag &= ~( ICANON | ECHO );
+    tcsetattr( STDIN_FILENO, TCSANOW, &oldattr);
+    
 }
 void start_motors(void){
     //set speed to 30 out of 255
@@ -420,39 +442,12 @@ void set_forces(const Control_command& U, double Ct, double d){
       motor_3.set_force( round(force_3), CONTROLLER_RUN );
       motor_4.set_force( round(force_4), CONTROLLER_RUN );
 }
-//intializes the curses: getch()
-//initscr();
-/*
-char get_terminal_input(void)
-{//dissect and comment what is going on!
-    struct termios oldattr, newattr;
-    int ch;
-    tcgetattr( STDIN_FILENO, &oldattr );
-    newattr = oldattr;
-    newattr.c_lflag &= ~( ICANON | ECHO );
-    tcsetattr( STDIN_FILENO, TCSANOW, &newattr );
-    ch = getchar();
-    tcsetattr( STDIN_FILENO, TCSANOW, &oldattr );
-    return (char) ch;
-}
-*/
-int get_terminal_input(void)
-{
-    struct termios oldattr, newattr;
-    int ch;
-    tcgetattr( STDIN_FILENO, &oldattr );
-    newattr = oldattr;
-    newattr.c_lflag &= ~( ICANON | ECHO );
-    tcsetattr( STDIN_FILENO, TCSANOW, &oldattr);
-    ch = getchar();
-    tcsetattr( STDIN_FILENO, TCSANOW, &oldattr );
-    return ch;
-}
 void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon_data){
-     cout << "IN DISPLAY_INFO" << endl;
-        printf("<==========================================>\n");   	
-	      printf("Controller ON \n");
-       	printf("    IMU DATA    \n");
+    system("clear");
+        cout << "IN DISPLAY_INFO" << endl;
+    printf("<==========================================>\n");   	
+    printf("Controller ON \n");
+        printf("    IMU DATA    \n");
         printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
@@ -462,22 +457,32 @@ void display_info(const State& imu_data, const State& error, const Control_comma
         printf("theta: %.2f       y: %.2f\n",vicon_data.theta, vicon_data.y);
         printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi, vicon_data.z);
 
-       // printf("    GAINS       \n");
-       // printf("kp_phi: %f  kd_phi: %f\n",gains.kp_phi, gains.kd_phi);
-       // printf("kp_theta: %f    kd_theta: %f\n",gains.kp_theta, gains.kd_theta);
-       // printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
+    printf("    GAINS       \n");
+        printf("kp_phi: %f  kd_phi: %f\n",gains.kp_phi, gains.kd_phi);
+        printf("kp_theta: %f    kd_theta: %f\n",gains.kp_theta, gains.kd_theta);
+        printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
 
-        printf("    Errors (rad or degrees: currently degrees)      \n");
-        printf("e_phi: %f,  e_theta: %f,    e_psi: %f\n\n\n",error.phi, error.theta, error.psi);
 
-        printf("     Acceleration (N/s^2)      \n");
-        printf("roll_acc: %f,   pitch_acc: %f,    yaw_acc: %f \n\n\n", U.roll_acc, U.pitch_acc, U.yaw_acc);
+    printf("    ERRORS (rad or degrees: currently degrees)      \n");
+        printf("e_phi: %.2f\n", error.phi);
+        printf("e_theta: %.2f\n", error.theta);
+        printf("e_psi: %.2f\n\n\n", error.psi);
 
-	      printf("    Thrust (0-255)     \n");
-	      printf("thrust: %f \n\n\n", U.thrust);
 
-        printf("    Forces (0-255)     \n");
-        printf("motor_1: %i,  motor_2: %i,   motor_3: %i,    motor_4: %i \n\n\n", motor_1.get_force(), motor_2.get_force() , motor_3.get_force(), motor_4.get_force());
+    printf("     ACCELERATION (N/s^2)      \n");
+        printf("roll_acc: %.2f\n", U.roll_acc);
+        printf("pitch_acc: %.2f\n", U.pitch_acc);
+        printf("yaw_acc: %.2f\n\n\n", U.yaw_acc);
+
+	printf("    THRUST (0-255)     \n");
+	    printf("thrust: %f \n\n\n", U.thrust);
+
+    printf("    FORCES (0-255)     \n");
+        printf("motor_1: %.2i\n", motor_1.get_force());
+        printf("motor_2: %.2i\n", motor_2.get_force());
+        printf("motor_3: %.2i\n", motor_3.get_force());
+        printf("motor_4: %.2i\n", motor_4.get_force());
+
 }
 void configure_threads(void){
     //pthread_t - is an abstract datatype that is used as a handle to reference the thread
@@ -547,6 +552,21 @@ int main(void){
 	usleep(onesecond);
     
 	start_motors();
+  /*
+   Vicon vicon_data;   
+    while(1){
+    cout << "controller.cpp: before get_vicon_data" << endl;
+
+    get_vicon_data(usb_xbee, vicon_data);
+
+    cout << "controller.cpp: after get_vicon_data" << endl;
+
+    cout << "VICON DATA " << endl;
+         printf("phi: %.2f         x: %.2f\n", vicon_data.phi, vicon_data.x);
+         printf("theta: %.2f       y: %.2f\n",vicon_data.theta, vicon_data.y);
+         printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi, vicon_data.z);
+    }
+*/
 
 	configure_threads();
 

@@ -15,7 +15,7 @@ void get_vicon_data(int port, Vicon& vicon_data)
  
     float data_received[6];
 
-    recieve_data(usb_xbee_fd, data_received,6);
+    recieve_data(port, data_received,6);
     unpack_data(vicon_data, data_received);
     
    // cout << "exit get_vicon_data" << endl;
@@ -207,6 +207,4 @@ int main(void){
     return 0;
 
 }
-
-
 */
