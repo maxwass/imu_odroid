@@ -201,22 +201,21 @@ void *control_stabilizer(void *thread_id){
     Vicon new_vicon_vel,      old_vicon_vel,      old_old_vicon_vel      = {0};
     Vicon new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel = {0};
 
+
+//for display
+    State imu_error = {0};
+    Control_command U = {0};
+
     while(SYSTEM_RUN) {
     
         //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
-        //get_imu_data(usb_imu, imu_data);
+        get_imu_data(usb_imu, imu_data);
             	//imu.retrieve(imu_data); //delete line above once implemented
-        
         //calc new times and delta
-        //cout << "times.current: " << tv2float(times.current) << endl;
-        //cout << "times.old: " << tv2float(times.old) << endl;        
-        //cout << "times.delta: " << tv2float(times.delta) << endl;
         time_calc(times);    
-        cout << "--time_calc--" << endl;
-         printf("current time: %.8f  old time: %.8f  delta_t: %.8f\n", tv2float(times.current), tv2float(times.old), tv2float(times.delta));
-        /*
+       
         //get vicon data
-	    get_vicon_data(usb_xbee, new_vicon);
+	    //get_vicon_data(usb_xbee, new_vicon);
         //filter vicon data
         new_filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
 
@@ -224,7 +223,6 @@ void *control_stabilizer(void *thread_id){
         new_vicon_vel = vicon_velocity(new_filt_vicon, old_filt_vicon);
         //filter velocities
         new_filt_vicon_vel = filter_vicon_data(new_vicon_vel, old_vicon_vel, old_old_vicon_vel, weights);       
-       i/ cout << "times.current: " << tv2float(times.current) << endl;
     
  //set old_old data to old_data, and old_data to new data
         //vicon data
@@ -236,7 +234,7 @@ void *control_stabilizer(void *thread_id){
         pushback(new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel);
 
         //saturate vicon velocities in calculations
-
+        
         //calculate error from vicon
         error_vicon(vicon_error, new_filt_vicon, new_filt_vicon_vel, desired_positions,times);
 
@@ -251,12 +249,11 @@ void *control_stabilizer(void *thread_id){
     	
           //calculate the forces of each motor and change force on motor objects
           // and send via i2c 
-        set_forces(U,Ct,d);
+        //set_forces(U,Ct,d);
 	 
-        if(DISPLAY_RUN) { display_info(imu_data, imu_error, U, new_vicon); }
+        if(DISPLAY_RUN) { display_info(imu_data, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles); }
   
-        */
-        }
+    }
   
     cout << "EXIT CONTROL_STABILIZER" << endl;
 
@@ -389,7 +386,19 @@ void set_gains(Gains& gains){
     gains.kd_phi = 0.32;
     
     gains.kp_psi = 5.2;
-    gains.kd_psi = 0.3;  
+    gains.kd_psi = 0.3; 
+
+    gains.kp_x = 19.5;
+    gains.kd_x = 2.7;
+    gains.ki_x = .05;
+
+    gains.kp_y = gains.kp_x;
+    gains.kd_y = gains.kd_x;
+    gains.ki_y = gains.ki_x;
+
+    gains.kp_z = 12.0;
+    gains.kd_z = 5.0;
+    gains.ki_z = 5.0;
 }
 void set_initial_times(Times& times){
        clock_gettime(CLOCK_REALTIME,&(times.current));
@@ -416,6 +425,9 @@ void set_timespec(timespec& x, timespec& y){
 }
 void time_calc(Times& times){
         //get current time, swap current and past, calc delta_t
+
+//printf("current time: %.8f  old time: %.8f  delta_t: %.8f\n", tv2float(times.current), tv2float(times.old), tv2float(times.delta));
+
 //update current time
 clock_gettime(CLOCK_REALTIME,&(times.current));
 
@@ -498,7 +510,7 @@ Vicon vicon_velocity(Vicon& current, Vicon& old){
 
     return velocity;    
 }
-void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon_data){
+void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles){
     system("clear");
         cout << "IN DISPLAY_INFO" << endl;
     printf("<==========================================>\n");   	
@@ -508,28 +520,50 @@ void display_info(const State& imu_data, const State& error, const Control_comma
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
 
-	printf("    VICON DATA    \n");
-        printf("phi: %.2f         x: %.2f\n", vicon_data.phi, vicon_data.x);
-        printf("theta: %.2f       y: %.2f\n",vicon_data.theta, vicon_data.y);
-        printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi, vicon_data.z);
+	printf("    vicon data    \n");
+        printf("phi: %.2f         x: %.2f\n", vicon.phi, vicon.x);
+        printf("theta: %.2f       y: %.2f\n",vicon.theta, vicon.y);
+        printf("psi: %.2f         z: %.2f\n\n\n",vicon.psi, vicon.z);
 
+    
+ 	printf("   filtered vicon data    \n");
+        printf("phi: %.2f         x: %.2f\n", vicon_filt.phi, vicon_filt.x);
+        printf("theta: %.2f       y: %.2f\n",vicon_filt.theta, vicon_filt.y);
+        printf("psi: %.2f         z: %.2f\n\n\n",vicon_filt.psi, vicon_filt.z);
+ 
+    printf("    vicon velocity    \n");
+        printf("phi_dot: %.2f         x_dot: %.2f\n", vicon_vel.phi, vicon_vel.x);
+        printf("theta_dot: %.2f       y_dot: %.2f\n",vicon_vel.theta, vicon_vel.y);
+        printf("psi_dot: %.2f         z_dot: %.2f\n\n\n",vicon_vel.psi, vicon_vel.z);
+
+    printf("   filtered vicon velocity    \n");
+        printf("phi_dot: %.2f         x_dot: %.2f\n", vicon_vel_filt.phi, vicon_vel_filt.x);
+        printf("theta_dot: %.2f       y_dot: %.2f\n",vicon_vel_filt.theta, vicon_vel_filt.y);
+        printf("psi_dot: %.2f         z_dot: %.2f\n\n\n",vicon_vel_filt.psi, vicon_vel_filt.z);
+
+    printf("     DESIRED ANGLES      \n");
+        printf("theta: %.2f\n", desired_angles.theta);
+        printf("phi: %.2f\n", desired_angles.phi);
+        printf("psi: %.2f\n\n\n", desired_angles.psi);
+
+/*
     printf("    GAINS       \n");
         printf("kp_phi: %f  kd_phi: %f\n",gains.kp_phi, gains.kd_phi);
         printf("kp_theta: %f    kd_theta: %f\n",gains.kp_theta, gains.kd_theta);
         printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
-
+*/
 
     printf("    ERRORS (rad or degrees: currently degrees)      \n");
         printf("e_phi: %.2f\n", error.phi);
         printf("e_theta: %.2f\n", error.theta);
         printf("e_psi: %.2f\n\n\n", error.psi);
 
-
+/*
     printf("     ACCELERATION (N/s^2)      \n");
         printf("roll_acc: %.2f\n", U.roll_acc);
         printf("pitch_acc: %.2f\n", U.pitch_acc);
         printf("yaw_acc: %.2f\n\n\n", U.yaw_acc);
-
+*/
 	printf("    THRUST (0-255)     \n");
 	    printf("thrust: %f \n\n\n", U.thrust);
 

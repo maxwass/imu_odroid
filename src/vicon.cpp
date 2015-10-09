@@ -23,8 +23,15 @@ Vicon filter_vicon_data(Vicon& new_vicon, Vicon& old_vicon, Vicon& old_old_vicon
 
     Vicon filt_vicon = {0.0};
 
+    //cout << "inputs: " << endl;
+    //cout << "new_vicon.x: " << new_vicon.x << endl;
+    //cout << "old_vicon.x: " << old_vicon.x << endl;
+    //cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
+
     //filt_vicon.x = (weights.newest * new_vicon.x) + (weights.old * old_vicon.x) + (weights.old_old * old_old_vicon.x);
     filt_vicon.x = filt(new_vicon.x, old_vicon.x, old_old_vicon.x, weights);
+    //cout << "outputs: " << endl;
+    //cout << "filt_vicon.x: " << filt_vicon.x << endl;
     filt_vicon.y = filt(new_vicon.y, old_vicon.y, old_old_vicon.y, weights);
     filt_vicon.z = filt(new_vicon.z, old_vicon.z, old_old_vicon.z, weights);
     filt_vicon.theta = filt(new_vicon.theta, old_vicon.theta, old_old_vicon.theta, weights);
@@ -47,6 +54,7 @@ Vicon filter_vicon_data(Vicon& new_vicon, Vicon& old_vicon, Vicon& old_old_vicon
     
     cout << endl;
     */
+    return filt_vicon;
 }
 float filt(float new_data, float old_data, float old_old_data, Weights& weights){
     float f = (weights.newest * new_data) + (weights.old * old_data) + (weights.old_old * old_old_data);
