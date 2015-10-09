@@ -57,6 +57,7 @@ Angles angles(const Vicon& vicon_data, const Positions& desired_positions);
 State state_error(const State& imu_data, const Angles& desired_angles);
 Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
+Vicon vicon_velocity(Vicon& current, Vicon& old);
 void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon_data);
 void configure_threads(void);
 

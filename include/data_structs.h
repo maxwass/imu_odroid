@@ -40,6 +40,5 @@ typedef struct weights {
 float newest, old, old_old;
 } Weights;
 
-
 #endif
 // __DATA_STRUCTS_H_INCLUDED__
