@@ -9,7 +9,7 @@
 #include <sys/time.h>
 #include <time.h> // for struct timeval
 typedef struct state {
-    float theta, phi, psi, theta_dot, phi_dot, psi_dot;
+float theta, phi, psi, theta_dot, phi_dot, psi_dot;
 } State ;
  
 typedef struct angles {
@@ -24,7 +24,7 @@ typedef struct positions {
 double x, y, z;
 } Positions;
 
-typedef struct positions {
+typedef struct velocities {
 double vx, vy, vz;
 } Velocities;
 
@@ -32,8 +32,8 @@ typedef struct errors {
 float prop, deriv, integral;
 } Errors;
 
-typedef struct state_error
-struct errors x, y, z, phi, theta, psi;
+typedef struct state_error {
+errors x, y, z, phi, theta, psi;
 } State_Error;
 
 typedef struct control_command {
@@ -44,10 +44,8 @@ typedef struct gains {
 double kp_theta, kd_theta, kp_phi, kd_phi, kp_psi, kd_psi, kp_x, kd_x, ki_x, kp_y, kd_y, ki_y, kp_z, kd_z, ki_z;
 } Gains; 
 
-
-
 typedef struct times {
-timeval current, old, old_old, delta;
+timespec current, old, old_old, delta;
 } Times; 
 
 typedef struct weights {

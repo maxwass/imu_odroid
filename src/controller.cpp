@@ -194,12 +194,12 @@ void *control_stabilizer(void *thread_id){
     State_Error vicon_error;
 
     //position from raw data
-    Vicon new_vicon,          old_vicon,          old_old_vicon          = {0.0};  
-    Vicon new_filt_vicon,     old_filt_vicon,     old_old_filt_vicon     = {0,0};
+    Vicon new_vicon,          old_vicon,          old_old_vicon          = {0};  
+    Vicon new_filt_vicon,     old_filt_vicon,     old_old_filt_vicon     = {0};
 
     //velocity from raw data
-    Vicon new_vicon_vel,      old_vicon_vel,      old_old_vicon_vel      = {0,0};
-    Vicon new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel = {0,0};
+    Vicon new_vicon_vel,      old_vicon_vel,      old_old_vicon_vel      = {0};
+    Vicon new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel = {0};
 
     while(SYSTEM_RUN) {
     
@@ -207,18 +207,24 @@ void *control_stabilizer(void *thread_id){
         //get_imu_data(usb_imu, imu_data);
             	//imu.retrieve(imu_data); //delete line above once implemented
         
-        //calc new times and delta                                                                                                                                 
+        //calc new times and delta
+        //cout << "times.current: " << tv2float(times.current) << endl;
+        //cout << "times.old: " << tv2float(times.old) << endl;        
+        //cout << "times.delta: " << tv2float(times.delta) << endl;
         time_calc(times);    
-    	
+        cout << "--time_calc--" << endl;
+         printf("current time: %.8f  old time: %.8f  delta_t: %.8f\n", tv2float(times.current), tv2float(times.old), tv2float(times.delta));
+        /*
         //get vicon data
 	    get_vicon_data(usb_xbee, new_vicon);
         //filter vicon data
         new_filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
 
         //calc velocities from vicon
-        new_vicon_velocity = vicon_velocity(new_filt_vicon, old_filt_vicon);
+        new_vicon_vel = vicon_velocity(new_filt_vicon, old_filt_vicon);
         //filter velocities
-        new_filt_vicon_vel = filter_vicon_data(new_vicon_velocity, old_vicon_velocity, old_old_vicon_velocity, weights);       
+        new_filt_vicon_vel = filter_vicon_data(new_vicon_vel, old_vicon_vel, old_old_vicon_vel, weights);       
+       i/ cout << "times.current: " << tv2float(times.current) << endl;
     
  //set old_old data to old_data, and old_data to new data
         //vicon data
@@ -232,22 +238,25 @@ void *control_stabilizer(void *thread_id){
         //saturate vicon velocities in calculations
 
         //calculate error from vicon
-        vicon_error(vicon_error, new_filt_vicon, new_filt_vicon_vel, desired_positions);
+        error_vicon(vicon_error, new_filt_vicon, new_filt_vicon_vel, desired_positions,times);
 
     	//calculate desired attitude (phi theta phi)
     	Angles desired_angles = angles(vicon_error, gains);
     	
 	     //calculate error from imu (in radians) between desired and measured state
-        State imu_error = imu_error(imu_data, desired_angles);
+        State imu_error = error_imu(imu_data, desired_angles);
     	
         //calculate thrust and desired acceleration
-        Control_command U = thrust(imu_error, U_trim, gains);
+        Control_command U = thrust(imu_error,vicon_error, U_trim, gains);
     	
           //calculate the forces of each motor and change force on motor objects
           // and send via i2c 
         set_forces(U,Ct,d);
-	 if(DISPLAY_RUN) { display_info(imu_data, imu_error, U, new_vicon); }
-    }
+	 
+        if(DISPLAY_RUN) { display_info(imu_data, imu_error, U, new_vicon); }
+  
+        */
+        }
   
     cout << "EXIT CONTROL_STABILIZER" << endl;
 
@@ -260,12 +269,12 @@ Angles a;
        // theta_d =  - kp_g*ex - ki_g*ex_i + kd_g*vel_filtered[0]
 
 a.psi = 0;
-a.phi     =  gains.kp_y*error.y - gains.kd_y*error.y.deriv + gains.ki_y*error.y.integral;
-a.theta   = -gains.kp_x*error.x + gains.kd_x*error.x.deriv - gains.ki_x*error.x.integral;
+a.phi     =  gains.kp_y*error.y.prop - gains.kd_y*error.y.deriv + gains.ki_y*error.y.integral;
+a.theta   = -gains.kp_x*error.x.prop + gains.kd_x*error.x.deriv - gains.ki_x*error.x.integral;
 return a;
 
 }
-State_Error vicon_error(State_Error& error, const Vicon& pos_filt, const Vicon& vel_filt, Positions& desired_positions, const Times& times){
+State_Error error_vicon(State_Error& error, const Vicon& pos_filt, const Vicon& vel_filt, const Positions& desired_positions, const Times& times){
        
         //proportional errors:  desired_positions - filtered_positions
         error.x.prop = desired_positions.x - pos_filt.x;
@@ -278,9 +287,9 @@ State_Error vicon_error(State_Error& error, const Vicon& pos_filt, const Vicon& 
         error.z.deriv = 0 - vel_filt.z;
        
         //integral errors: integral error + (proportional error * delta_t)
-        error.x.integral = error.x.integral + (error.x.prop * times.delta);
-        error.y.integral = error.y.integral + (error.y.prop * times.delta);
-        error.z.integral = error.z.integral + (error.z.prop * times.delta);
+        error.x.integral = error.x.integral + (error.x.prop * tv2float(times.delta));
+        error.y.integral = error.y.integral + (error.y.prop * tv2float(times.delta));
+        error.z.integral = error.z.integral + (error.z.prop * tv2float(times.delta));
 
 }
 void *motor_signal(void *thread_id){
@@ -383,17 +392,18 @@ void set_gains(Gains& gains){
     gains.kd_psi = 0.3;  
 }
 void set_initial_times(Times& times){
-        gettimeofday(&(times.current),NULL);
-        gettimeofday(&(times.old),NULL);
-        gettimeofday(&(times.old_old),NULL);
-        gettimeofday(&(times.delta),NULL);
+       clock_gettime(CLOCK_REALTIME,&(times.current));
+       clock_gettime(CLOCK_REALTIME,&(times.old));
+       clock_gettime(CLOCK_REALTIME,&(times.old_old));
+       clock_gettime(CLOCK_REALTIME,&(times.delta));
+       
 }
 void set_initial_positions(Positions& init_positions){
 	init_positions.x = 0;
 	init_positions.y = 0;
 	init_positions.z = 0;
 }
-void set_timeval(timeval& x, timeval& y){
+void set_timespec(timespec& x, timespec& y){
     //set x to equal y
 
       //truct timeval {
@@ -402,49 +412,43 @@ void set_timeval(timeval& x, timeval& y){
       //           };
     
     x.tv_sec = y.tv_sec;
-    x.tv_usec = x.tv_usec;
+    x.tv_nsec = y.tv_nsec;
 }
 void time_calc(Times& times){
         //get current time, swap current and past, calc delta_t
-
 //update current time
-gettimeofday(&(times.current),NULL);
+clock_gettime(CLOCK_REALTIME,&(times.current));
 
 //delta = x-y
 //timeval_subtract(timeval Result, timeval x, timeval y)
-timeval_subtract(&(times.delta),&(times.current),&(times.old));
+//timeval_subtract(&(times.delta),&(times.current),&(times.old));
+times.delta = diff(times.old, times.current);
 
 //shift times back
-//set time_prev_2 to time_prev
-set_timeval(times.old_old, times.old);
+//set time_old_old to time_old
+set_timespec(times.old_old, times.old);
 
-//set time_prev to old current time
-set_timeval(times.old, times.current);
+//set time_old to current time
+set_timespec(times.old, times.current);
 }
 
-//function copied from GNU wesbite, cannot file library
-int timeval_subtract(timeval* result,timeval* x,timeval* y){
-  /* Perform the carry for the later subtraction by updating y. */
-  if (x->tv_usec < y->tv_usec) {
-    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
-    y->tv_usec -= 1000000 * nsec;
-    y->tv_sec += nsec;
-  }
-  if (x->tv_usec - y->tv_usec > 1000000) {
-    int nsec = (y->tv_usec - x->tv_usec) / 1000000;
-    y->tv_usec += 1000000 * nsec;
-    y->tv_sec -= nsec;
-  }
+timespec diff(timespec start, timespec end)
+{
+    timespec temp;
+    if ((end.tv_nsec-start.tv_nsec)<0) {
+        temp.tv_sec = end.tv_sec-start.tv_sec-1;
+        temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    } else {  
+            temp.tv_sec = end.tv_sec-start.tv_sec;
+            temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return temp;
 
-  /* Compute the time remaining to wait.
-     tv_usec is certainly positive. */
-  result->tv_sec = x->tv_sec - y->tv_sec;
-  result->tv_usec = x->tv_usec - y->tv_usec;
-
-  /* Return 1 if result is negative. */
-  return x->tv_sec < y->tv_sec;
 }
-State imu_error(const State& imu_data, const Angles& desired_angles){
+double tv2float (const timespec& time){
+     return ((double) time.tv_sec + (time.tv_nsec / 1000000000.0)) ;
+}
+State error_imu(const State& imu_data, const Angles& desired_angles){
     //calculate error in RADIANS
     //  xxx_d is xxx_desired.  imu outputs  degrees, we convert to radians with factor PI/180
     State error;
@@ -456,11 +460,11 @@ State imu_error(const State& imu_data, const Angles& desired_angles){
     error.psi_dot   =                           (-imu_data.psi_dot) * PI/180;
     return error;
 }
-Control_command thrust(const State& imu_error, const State_error& vicon_error, const Control_command& U_trim, const Gains& gains){
+Control_command thrust(const State& imu_error, const State_Error& vicon_error, const Control_command& U_trim, const Gains& gains){
     //calculate thrust and acceleration
     //U[0] thrust, U[1:3]: roll acc, pitch acc, yaw acc
     Control_command U;
-    int raw_thrust = (int) (-(gains.kp_z * vicon_error.z.prop)  -  (gains.kd_z * vicon_error.z.deriv) - (gains.ki_z * vicon_error.z.integal));
+    int raw_thrust = (int) (-(gains.kp_z * vicon_error.z.prop)  -  (gains.kd_z * vicon_error.z.deriv) - (gains.ki_z * vicon_error.z.integral));
 
     U.thrust    =  raw_thrust + U_trim.thrust;
     U.roll_acc  =  (gains.kp_phi   * imu_error.phi  )  +  (gains.kd_phi   * imu_error.phi_dot  )  + U_trim.roll_acc;
@@ -485,12 +489,12 @@ Vicon vicon_velocity(Vicon& current, Vicon& old){
     
     Vicon velocity = {0.0};
     
-    velocity.x     = (current.x - old.x)/times.delta;
-    velocity.y     = (current.y - old.y)/times.delta;
-    velocity.z     = (current.z - old.z)/times.delta;
-    velocity.theta = (current.theta - old.theta)/times.delta;
-    velocity.phi   = (current.phi - old.phi)/times.delta;
-    velocity.psi   = (current.psi - old.psi)/times.delta;
+    velocity.x     = (current.x - old.x)/tv2float(times.delta);
+    velocity.y     = (current.y - old.y)/tv2float(times.delta);
+    velocity.z     = (current.z - old.z)/tv2float(times.delta);
+    velocity.theta = (current.theta - old.theta)/tv2float(times.delta);
+    velocity.phi   = (current.phi - old.phi)/tv2float(times.delta);
+    velocity.psi   = (current.psi - old.psi)/tv2float(times.delta);
 
     return velocity;    
 }
