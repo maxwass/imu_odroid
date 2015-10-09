@@ -33,10 +33,12 @@ double kp_theta, kd_theta, kp_phi, kd_phi, kp_psi, kd_psi;
 } Gains; 
 
 typedef struct times {
-struct timeval current, prev, prev_2, delta;
+struct timeval current, old, old_old, delta;
 } Times; 
 
-
+typedef struct weights {
+float newest, old, old_old;
+} Weights;
 
 #endif
 // __DATA_STRUCTS_H_INCLUDED__

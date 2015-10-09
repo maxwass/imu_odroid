@@ -187,10 +187,14 @@ void *control_stabilizer(void *thread_id){
     cout << "INSIDE CONTROL_STABALIZER" << endl;
 
     State imu_data; 
-    Vicon new_vicon, old_vicon, old_old_vicon = {0.0};
     //weights is used for filter: current, one value ago, 2 values ago
     Weights weights = {.7,.2,.1};
 
+    Vicon new_vicon,          old_vicon,          old_old_vicon          = {0.0};  
+    Vicon new_filt_vicon,     old_filt_vicon,     old_old_filt_vicon     = {0,0};
+
+    Vicon new_vicon_vel,      old_vicon_vel,      old_old_vicon_vel      = {0,0};
+    Vicon new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel = {0,0};
 
     while(SYSTEM_RUN) {
        // cout << "1" << endl;
@@ -199,26 +203,39 @@ void *control_stabilizer(void *thread_id){
          //get_imu_data(usb_imu, imu_data);
     	//imu.retrieve(imu_data); //delete line above once implemented
         // cout << "2" << endl;
+        
+        //calc new times and delta                                                                                                                                 
+        time_calc(times);    
     	
-    	//get vicon data
+        //get vicon data
 	    get_vicon_data(usb_xbee, new_vicon);
-
         //filter vicon data
-        Vicon filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
-        cout << "READ NEW DATA" << endl;
-        cout << "new_vicon.x" << new_vicon.x << endl;
-        cout << "old_vicon.x" << old_vicon.x << endl;
-        cout << "old_old_vicon.x" << old_old_vicon.x << endl; 
+        new_filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
 
-
-        pushback(new_vicon,old_vicon,old_old_vicon);
-       // cout << "3" << endl;
+        //calc velocities from vicon
+        new_vicon_velocity = vicon_velocity(new_vicon, old_vicon);
+        //filter velocities
+        new_filt_vicon_vel = filter_vicon_data(new_vicon_velocity, old_vicon_velocity, old_old_vicon_velocity, weights);       
     
-        cout << "new_vicon.x" << new_vicon.x << endl;
-        cout << "old_vicon.x" << old_vicon.x << endl;
-        cout << "old_old_vicon.x" << old_old_vicon.x << endl; 
-        cout << endl;
 
+ //set old_old data to old_data, and old_data to new data
+        //vicon data
+        pushback(new_vicon,      old_vicon,      old_old_vicon);
+        pushback(new_filt_vicon, old_filt_vicon, old_old_filt_vicon);
+
+        //calculated vicon velocities
+        pushback(new_vicon_vel,      old_vicon_vel,      old_old_vicon_vel);
+        pushback(new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel);
+
+        //saturate vicon velocities in calculations
+
+
+  //test      
+
+
+
+        // cout << "3" << endl;
+        
     	//calculate desired attitude (phi theta phi)
     	Angles desired_angles = angles(filt_vicon,desired_positions);
 	   // cout << "4" << endl;
@@ -353,8 +370,8 @@ void set_gains(Gains& gains){
 }
 void set_initial_times(Times& times){
         gettimeofday(&(times.current),NULL);
-        gettimeofday(&(times.prev),NULL);
-        gettimeofday(&(times.prev_2),NULL);
+        gettimeofday(&(times.old),NULL);
+        gettimeofday(&(times.old_old),NULL);
         gettimeofday(&(times.delta),NULL);
 }
 void set_initial_positions(Positions& init_positions){
@@ -375,22 +392,23 @@ void set_timeval(timeval& x, timeval& y){
 }
 void time_calc(Times& times){
         //get current time, swap current and past, calc delta_t
-//x-y
-//timeval_subtract(timeval Result, timeval x, timeval y)
-timeval_subtract(&(times.delta),&(times.current),&(times.prev));
-
-//shift times back
-//set time_prev_2 to time_prev
-set_timeval(times.prev_2, times.prev);
-
-//set time_prev to old current time
-set_timeval(times.prev, times.current);
 
 //update current time
 gettimeofday(&(times.current),NULL);
 
+//delta = x-y
+//timeval_subtract(timeval Result, timeval x, timeval y)
+timeval_subtract(&(times.delta),&(times.current),&(times.old));
+
+//shift times back
+//set time_prev_2 to time_prev
+set_timeval(times.old_old, times.old);
+
+//set time_prev to old current time
+set_timeval(times.old, times.current);
 }
-//function copied form GNU wesbite, cannot file library
+
+//function copied from GNU wesbite, cannot file library
 int timeval_subtract(timeval* result,timeval* x,timeval* y){
   /* Perform the carry for the later subtraction by updating y. */
   if (x->tv_usec < y->tv_usec) {
@@ -446,6 +464,19 @@ void set_forces(const Control_command& U, double Ct, double d){
       motor_2.set_force( round(force_2), CONTROLLER_RUN );
       motor_3.set_force( round(force_3), CONTROLLER_RUN );
       motor_4.set_force( round(force_4), CONTROLLER_RUN );
+}
+Vicon vicon_velocity(Vicon& current, Vicon& old){
+    
+    Vicon velocity = {0.0};
+    
+    velocity.x     = (current.x - old.x)/times.delta;
+    velocity.y     = (current.y - old.y)/times.delta;
+    velocity.z     = (current.z - old.z)/times.delta;
+    velocity.theta = (current.theta - old.theta)/times.delta;
+    velocity.phi   = (current.phi - old.phi)/times.delta;
+    velocity.psi   = (current.psi - old.psi)/times.delta;
+
+    return velocity;    
 }
 void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon_data){
     system("clear");
