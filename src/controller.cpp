@@ -205,20 +205,10 @@ void *control_stabilizer(void *thread_id){
 
         //filter vicon data
         Vicon filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
-        cout << "READ NEW DATA" << endl;
-        cout << "new_vicon.x" << new_vicon.x << endl;
-        cout << "old_vicon.x" << old_vicon.x << endl;
-        cout << "old_old_vicon.x" << old_old_vicon.x << endl; 
-
 
         pushback(new_vicon,old_vicon,old_old_vicon);
        // cout << "3" << endl;
     
-        cout << "new_vicon.x" << new_vicon.x << endl;
-        cout << "old_vicon.x" << old_vicon.x << endl;
-        cout << "old_old_vicon.x" << old_old_vicon.x << endl; 
-        cout << endl;
-
     	//calculate desired attitude (phi theta phi)
     	Angles desired_angles = angles(filt_vicon,desired_positions);
 	   // cout << "4" << endl;

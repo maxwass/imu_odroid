@@ -53,24 +53,8 @@ float filt(float new_data, float old_data, float old_old_data, Weights& weights)
     return f;
 }
 void pushback(Vicon& new_vicon, Vicon& old_vicon, Vicon& old_old_vicon){
-    cout << endl;
-    cout << "IN PUSHBACK" << endl;    
-    cout << "old_vicon.x: " << old_vicon.x << endl;
-    cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
-    cout << "   assign old_old_vicon = old_vicon " << endl;
-    
     old_old_vicon = old_vicon;
-    cout << "old_vicon.x: " << old_vicon.x << endl;
-    cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
-
-    cout << "   assign old_vicon = new_vicon " << endl;
     old_vicon = new_vicon;
-    cout << "new_vicon.x: " << new_vicon.x << endl;
-    cout << "old_vicon.x: " << old_vicon.x << endl;
-    cout << "old_old_vicon.x: " << old_old_vicon.x << endl;
-    cout << "EXIT PUSHBACK" << endl; 
-    cout << endl;
-
 }
 void unpack_data(Vicon& vicon_data, float arr[]){
     //distributes data from the input buffer to the imu_data data structure
