@@ -190,19 +190,22 @@ void *control_stabilizer(void *thread_id){
     //weights is used for filter: current, one value ago, 2 values ago
     Weights weights = {.7,.2,.1};
 
+    //for error calculations PID
+    State_Error vicon_error;
+
+    //position from raw data
     Vicon new_vicon,          old_vicon,          old_old_vicon          = {0.0};  
     Vicon new_filt_vicon,     old_filt_vicon,     old_old_filt_vicon     = {0,0};
 
+    //velocity from raw data
     Vicon new_vicon_vel,      old_vicon_vel,      old_old_vicon_vel      = {0,0};
     Vicon new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel = {0,0};
 
     while(SYSTEM_RUN) {
-       // cout << "1" << endl;
-    	 //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
-       
-         //get_imu_data(usb_imu, imu_data);
-    	//imu.retrieve(imu_data); //delete line above once implemented
-        // cout << "2" << endl;
+    
+        //flushed input buffer, reads input from imu (in degrees), distributes into fields of imu_data
+        //get_imu_data(usb_imu, imu_data);
+            	//imu.retrieve(imu_data); //delete line above once implemented
         
         //calc new times and delta                                                                                                                                 
         time_calc(times);    
@@ -213,7 +216,7 @@ void *control_stabilizer(void *thread_id){
         new_filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
 
         //calc velocities from vicon
-        new_vicon_velocity = vicon_velocity(new_vicon, old_vicon);
+        new_vicon_velocity = vicon_velocity(new_filt_vicon, old_filt_vicon);
         //filter velocities
         new_filt_vicon_vel = filter_vicon_data(new_vicon_velocity, old_vicon_velocity, old_old_vicon_velocity, weights);       
     
@@ -229,44 +232,56 @@ void *control_stabilizer(void *thread_id){
 
         //saturate vicon velocities in calculations
 
+        //calculate error from vicon
+        vicon_error(vicon_error, new_filt_vicon, new_filt_vicon_vel, desired_positions);
 
-  //test      
-
-
-
-        // cout << "3" << endl;
-        
     	//calculate desired attitude (phi theta phi)
-    	Angles desired_angles = angles(filt_vicon,desired_positions);
-	   // cout << "4" << endl;
+    	Angles desired_angles = angles(vicon_error, gains);
     	
-	     //calculate error (in radians) between desired and measured state
-        State error = state_error(imu_data, desired_angles);
-         // cout << "5" << endl;
+	     //calculate error from imu (in radians) between desired and measured state
+        State imu_error = imu_error(imu_data, desired_angles);
     	
         //calculate thrust and desired acceleration
-        Control_command U = thrust(error, U_trim, gains);
-         //cout << "6" << endl;
+        Control_command U = thrust(imu_error, U_trim, gains);
     	
           //calculate the forces of each motor and change force on motor objects
           // and send via i2c 
-          //set_forces(U,Ct,d);
-	 if(DISPLAY_RUN) { display_info(imu_data, error, U, new_vicon); }
-
+        set_forces(U,Ct,d);
+	 if(DISPLAY_RUN) { display_info(imu_data, imu_error, U, new_vicon); }
     }
   
     cout << "EXIT CONTROL_STABILIZER" << endl;
 
     pthread_exit(NULL);
 }
-Angles angles(const Vicon& vicon_data, const Positions& desired_positions){
+Angles angles(const State_Error& error, const Gains& gains){
 
 Angles a;
+       // phi_d =   kp_g*ey + ki_g*ey_i - kd_g*vel_filtered[1];
+       // theta_d =  - kp_g*ex - ki_g*ex_i + kd_g*vel_filtered[0]
 
-a.theta = 0;
-a.phi   = 0;
-a.psi   = 0;
+a.psi = 0;
+a.phi     =  gains.kp_y*error.y - gains.kd_y*error.y.deriv + gains.ki_y*error.y.integral;
+a.theta   = -gains.kp_x*error.x + gains.kd_x*error.x.deriv - gains.ki_x*error.x.integral;
 return a;
+
+}
+State_Error vicon_error(State_Error& error, const Vicon& pos_filt, const Vicon& vel_filt, Positions& desired_positions, const Times& times){
+       
+        //proportional errors:  desired_positions - filtered_positions
+        error.x.prop = desired_positions.x - pos_filt.x;
+        error.y.prop = desired_positions.y - pos_filt.y;
+        error.z.prop = desired_positions.z - pos_filt.z;
+       
+        //derivative errors: desired_velocities - filtered_velocities
+        error.x.deriv = 0 - vel_filt.x;
+        error.y.deriv = 0 - vel_filt.y;
+        error.z.deriv = 0 - vel_filt.z;
+       
+        //integral errors: integral error + (proportional error * delta_t)
+        error.x.integral = error.x.integral + (error.x.prop * times.delta);
+        error.y.integral = error.y.integral + (error.y.prop * times.delta);
+        error.z.integral = error.z.integral + (error.z.prop * times.delta);
 
 }
 void *motor_signal(void *thread_id){
@@ -430,7 +445,7 @@ int timeval_subtract(timeval* result,timeval* x,timeval* y){
   /* Return 1 if result is negative. */
   return x->tv_sec < y->tv_sec;
 }
-State state_error(const State& imu_data, const Angles& desired_angles){
+State imu_error(const State& imu_data, const Angles& desired_angles){
     //calculate error in RADIANS
     //  xxx_d is xxx_desired.  imu outputs  degrees, we convert to radians with factor PI/180
     State error;
@@ -442,14 +457,16 @@ State state_error(const State& imu_data, const Angles& desired_angles){
     error.psi_dot   =                           (-imu_data.psi_dot) * PI/180;
     return error;
 }
-Control_command thrust(const State& error, const Control_command& U_trim, const Gains& gains){
+Control_command thrust(const State& imu_error, const State_error& vicon_error, const Control_command& U_trim, const Gains& gains){
     //calculate thrust and acceleration
     //U[0] thrust, U[1:3]: roll acc, pitch acc, yaw acc
     Control_command U;
-    U.thrust = 30 + U_trim.thrust;
-    U.roll_acc  = gains.kp_phi   * error.phi   + gains.kd_phi   * error.phi_dot   + U_trim.roll_acc;
-    U.pitch_acc = gains.kp_theta * error.theta + gains.kd_theta * error.theta_dot + U_trim.pitch_acc;
-    U.yaw_acc   = gains.kp_psi   * error.psi   + gains.kd_psi   * error.psi_dot   + U_trim.yaw_acc;
+    int raw_thrust = (int) (-(gains.kp_z * vicon_error.z.prop)  -  (gains.kd_z * vicon_error.z.deriv) - (gains.ki_z * vicon_error.z.integal));
+
+    U.thrust    =  raw_thrust + U_trim.thrust;
+    U.roll_acc  =  (gains.kp_phi   * imu_error.phi  )  +  (gains.kd_phi   * imu_error.phi_dot  )  + U_trim.roll_acc;
+    U.pitch_acc =  (gains.kp_theta * imu_error.theta)  +  (gains.kd_theta * imu_error.theta_dot)  + U_trim.pitch_acc;
+    U.yaw_acc   =  (gains.kp_psi   * imu_error.psi  )  +  (gains.kd_psi   * imu_error.psi_dot  )  + U_trim.yaw_acc;
     return U;
 }
 void set_forces(const Control_command& U, double Ct, double d){

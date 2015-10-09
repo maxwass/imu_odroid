@@ -23,14 +23,28 @@ float x, y, z, phi, theta, psi;
 typedef struct positions {
 double x, y, z;
 } Positions;
- 
+
+typedef struct positions {
+double vx, vy, vz;
+} Velocities;
+
+typedef struct errors {
+float prop, deriv, integral;
+} Errors;
+
+typedef struct state_error
+struct errors x, y, z, phi, theta, psi;
+} State_Error;
+
 typedef struct control_command {
 double thrust, roll_acc, pitch_acc, yaw_acc;
 } Control_command;
 
 typedef struct gains {
-double kp_theta, kd_theta, kp_phi, kd_phi, kp_psi, kd_psi;
+double kp_theta, kd_theta, kp_phi, kd_phi, kp_psi, kd_psi, kp_x, kd_x, ki_x, kp_y, kd_y, ki_y, kp_z, kd_z, ki_z;
 } Gains; 
+
+
 
 typedef struct times {
 struct timeval current, old, old_old, delta;
