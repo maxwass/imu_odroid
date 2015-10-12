@@ -190,7 +190,7 @@ void *control_stabilizer(void *thread_id){
     //weights is used for filter: current, one value ago, 2 values ago
     Weights weights = {.7,.2,.1};
 
-    //for error calculations PID
+    //for error calculations PID: stores the actual errors, not gains
     State_Error vicon_error;
 
     //position from raw data
@@ -215,7 +215,7 @@ void *control_stabilizer(void *thread_id){
         time_calc(times);    
        
         //get vicon data
-	    //get_vicon_data(usb_xbee, new_vicon);
+	    get_vicon_data(usb_xbee, new_vicon);
         //filter vicon data
         new_filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
 
@@ -251,7 +251,7 @@ void *control_stabilizer(void *thread_id){
           // and send via i2c 
         //set_forces(U,Ct,d);
 	 
-        if(DISPLAY_RUN) { display_info(imu_data, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles); }
+        if(DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles); }
   
     }
   
@@ -510,12 +510,12 @@ Vicon vicon_velocity(Vicon& current, Vicon& old){
 
     return velocity;    
 }
-void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles){
+void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles){
     system("clear");
         cout << "IN DISPLAY_INFO" << endl;
     printf("<==========================================>\n");   	
     printf("Controller ON \n");
-        printf("    IMU DATA    \n");
+        printf("    IMU DATA (degrees)    \n");
         printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
         printf("psi: %.2f         psi dot: %.2f\n\n\n",imu_data.psi, imu_data.psi_dot);
@@ -541,9 +541,9 @@ void display_info(const State& imu_data, const State& error, const Control_comma
         printf("theta_dot: %.2f       y_dot: %.2f\n",vicon_vel_filt.theta, vicon_vel_filt.y);
         printf("psi_dot: %.2f         z_dot: %.2f\n\n\n",vicon_vel_filt.psi, vicon_vel_filt.z);
 
-    printf("     DESIRED ANGLES      \n");
-        printf("theta: %.2f\n", desired_angles.theta);
+    printf("     DESIRED ANGLES = f(vicon_error, gains)      \n");
         printf("phi: %.2f\n", desired_angles.phi);
+        printf("theta: %.2f\n", desired_angles.theta);
         printf("psi: %.2f\n\n\n", desired_angles.psi);
 
 /*
@@ -553,11 +553,15 @@ void display_info(const State& imu_data, const State& error, const Control_comma
         printf("kp_psi: %f  kd_psi: %f\n\n\n",gains.kp_psi, gains.kd_psi);
 */
 
-    printf("    ERRORS (rad or degrees: currently degrees)      \n");
-        printf("e_phi: %.2f\n", error.phi);
-        printf("e_theta: %.2f\n", error.theta);
-        printf("e_psi: %.2f\n\n\n", error.psi);
+    printf("  IMU ERRORS = f(imu_data, desired_angles) (radians)      \n");
+        printf("e_phi: %.2f\n", imu_error.phi);
+        printf("e_theta: %.2f\n", imu_error.theta);
+        printf("e_psi: %.2f\n\n\n", imu_error.psi);
 
+    printf("  VICON ERRORS (meters)      \n");
+        printf("x_prop: %.2f      y_prop %.2f       z_prop %.2f\n", vicon_error.x.prop, vicon_error.y.prop, vicon_error.z.prop);
+        printf("x_deriv: %.2f      y_deriv %.2f       z_deriv %.2f\n", vicon_error.x.deriv, vicon_error.y.deriv, vicon_error.z.deriv);
+        printf("x_integ: %.2f      y_integ %.2f       z_integ %.2f\n\n\n", vicon_error.x.integral, vicon_error.y.integral, vicon_error.z.integral);
 /*
     printf("     ACCELERATION (N/s^2)      \n");
         printf("roll_acc: %.2f\n", U.roll_acc);
@@ -642,23 +646,8 @@ int main(void){
 	usleep(onesecond);
     
 	start_motors();
-  /*
-   Vicon vicon_data;   
-    while(1){
-    cout << "controller.cpp: before get_vicon_data" << endl;
-
-    get_vicon_data(usb_xbee, vicon_data);
-
-    cout << "controller.cpp: after get_vicon_data" << endl;
-
-    cout << "VICON DATA " << endl;
-         printf("phi: %.2f         x: %.2f\n", vicon_data.phi, vicon_data.x);
-         printf("theta: %.2f       y: %.2f\n",vicon_data.theta, vicon_data.y);
-         printf("psi: %.2f         z: %.2f\n\n\n",vicon_data.psi, vicon_data.z);
-    }
-*/
-
-	configure_threads();
+	
+    configure_threads();
 
 	return 0;
 }

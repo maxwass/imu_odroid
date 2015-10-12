@@ -60,7 +60,7 @@ State error_imu(const State& imu_data, const Angles& desired_angles);
 Control_command thrust(const State& imu_error, const State_Error& vicon_error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
 Vicon vicon_velocity(Vicon& current, Vicon& old);
-void display_info(const State& imu_data, const State& error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles);
+void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles);
 void configure_threads(void);
 
 
