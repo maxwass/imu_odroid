@@ -1,8 +1,10 @@
 #include "vicon.h"
 //compilation requres -pthread option
+//#include "Xbee.h"
+//#include "receiver.h"
 
 int usb_xbee_fd;
-int num_bytes_per_read=2;
+int num_bytes_per_read=1;
 
 using namespace std;
 
@@ -12,7 +14,9 @@ using namespace std;
 void get_vicon_data(int port, Vicon& vicon_data)
 {
      //cout << "entering get_vicon_vicon_data" << endl;
+    tcflush(usb_xbee_fd,TCIFLUSH); 
     float data_received[6];
+    //XBee_receive_float(usb_xbee_fd,data_received,6); //Daewons function from receiver.h
     recieve_data(port, data_received,6);
     unpack_data(vicon_data, data_received);
      // cout << "exit get_vicon_data" << endl;
@@ -108,9 +112,6 @@ int open_vicon_port()
     //gets the parameters (options) associated with the terminal from the termios structure (newtio)
     tcgetattr(port, &newtio);
 
-    //Set local mode and enable the receiver
-    newtio.c_cflag |= (CLOCAL | CREAD);
-
     //set input/output baudrate
     cfsetospeed(&newtio, BAUDRATE);
     cfsetispeed(&newtio, BAUDRATE);
@@ -125,19 +126,22 @@ int open_vicon_port()
     newtio.c_cflag |= CS8;     //8 bits/byte
     
     //no parity bits
-    newtio.c_cflag &=~PARENB;
     newtio.c_cflag &= ~CSTOPB;
+    newtio.c_cflag &=~PARENB;
     
     //set for non-canonical (raw processing, no echo, etc.)
     newtio.c_iflag = IGNPAR; // ignore parity errors
     newtio.c_oflag = 0; // raw output
-    
+    newtio.c_lflag = 0; // raw input 
+
     //Time-Outs -- won't work with NDELAY option in the call to open
     //Will read until recieved a minimum of num_bytes_per_read bytes, no time limit
     newtio.c_cc[VMIN]  = num_bytes_per_read;   // block reading until RX x characers. If x = 0, it is non-blocking.
     newtio.c_cc[VTIME] = 0;   // Inter-Character Timer -- i.e. timeout= x*.1 s
     
-    
+     //Set local mode and enable the receiver
+     newtio.c_cflag |= (CLOCAL | CREAD);
+
     //Set the new options for the port...
     //TCSANOW - options go into affect immediately
     int status = tcsetattr(port, TCSANOW, &newtio);
@@ -225,8 +229,9 @@ int recieve_data(int fd_xbee, float data_received[], int data_size)
 }
 
 void vicon_init(void){
-
-     usb_xbee_fd = open_vicon_port();
+    
+    usb_xbee_fd = open_vicon_port();
+    //usb_xbee_fd = open_usbport_twobytes(); //Daewons functions from Xbee.h
 }
 /*
 int main(void){
@@ -239,11 +244,11 @@ int main(void){
 
   	    cout << "before get_vicon_data" << endl;
             get_vicon_data(usb_xbee_fd, vicon_data);
-
             //vicon.update(vicon_data); //UNCOMMENT WHEN IMPLEMENTED
-  
             display_vicon_data(vicon_data);
-     }
+           // usleep(10000);           
+  
+    }
 
     return 0;
 
