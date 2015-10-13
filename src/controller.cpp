@@ -4,14 +4,16 @@
 
 //initialize process-scoped data-structures
 Times times;
+Times time_m;
+
 Positions init_positions = {0.0};
 Positions desired_positions = {0.0};
 Gains gains;
 Control_command U_trim = {0.0};
 
 bool SYSTEM_RUN = true;
-bool CONTROLLER_RUN = false;
-bool DISPLAY_RUN = true;
+bool CONTROLLER_RUN = true;
+bool DISPLAY_RUN = false;
 
 int i2cHandle, usb_imu, usb_xbee;
 
@@ -41,7 +43,7 @@ void *command_input(void *thread_id){
         //command = getchar(); 
         //getline(cin, input);
         command = getch();
-        printf("\n");
+        printf("input: %i \n", command);
         switch (command) {
             case '1':
             case '2':
@@ -59,15 +61,52 @@ void *command_input(void *thread_id){
                 endwin();
                 break;
                 
-            case 'a':
-            case 'A':
             case ' ':
             case 'z':
             case 'Z':
             case '\n':
                 controller_on_off(CONTROLLER_RUN);
                 break;
-                
+
+// control of desired positions
+            case 'w':
+            case 'W':
+	          printf("Increase X desired_positions\n");
+              desired_positions.x = desired_positions.x + delta_position;
+                break; 
+    
+            case 's':
+            case 'S':
+	          printf("Decrease X desired_positions\n");
+              desired_positions.x = desired_positions.x - delta_position;
+                break; 
+            
+            case 'd':
+            case 'D':
+              printf("Increase Y desired_positions\n");
+              desired_positions.y = desired_positions.y + delta_position;
+              break;
+
+            case 'a':
+            case 'A':
+              printf("Decrease Y desired_positions\n");
+              desired_positions.y = desired_positions.y - delta_position;
+                break;
+
+            case 'r':
+            case 'R':
+              printf("Decrease Z desired_positions\n");
+              desired_positions.z = desired_positions.z - delta_position;
+                break;
+
+            case 'f':
+            case 'F':
+              printf("Increase Z desired_positions\n");
+              desired_positions.z = desired_positions.z + delta_position;
+                 break;
+
+// control of desired positions
+
             case 'b':
             case 'B':
                 display_on_off(DISPLAY_RUN);
@@ -84,29 +123,14 @@ void *command_input(void *thread_id){
                      printf("Increase Thrust: %f\n", U_trim.thrust);}
               break;
                 
-            case 'd':
-            case 'D':
+            case 'v':
+            case 'V':
                 if((U_trim.thrust-=delta_thrust) <= 0) {
                 printf("Thrust is 0. Cannot decrease further\n");
                 U_trim.thrust = 0;}
                 else {U_trim.thrust -= delta_thrust;
                       printf("Decrease Thrust: %f\n", U_trim.thrust);}
-                
               break;
-                
-            case 'e':
-            case 'E':
-                printf("Increase kp_phi and kp_theta\n");
-                gains.kp_phi   = gains.kp_phi   + 0.1;
-                gains.kp_theta = gains.kp_theta + 0.1;
-                break;
-                
-            case 'f':
-            case 'F':
-                printf("Decrease kp_phi and kp_theta\n");
-                gains.kp_phi   = gains.kp_phi   - 0.1;
-                gains.kp_theta = gains.kp_theta - 0.1;
-                break;
                 
             case 'g':
             case 'G':
@@ -129,46 +153,34 @@ void *command_input(void *thread_id){
               desired_positions.y = init_positions.y;
               desired_positions.z = init_positions.z;
               break;
-
+            
             case 'j':
             case 'J':
-	          printf("Increase X desired_positions\n");
-              desired_positions.x = desired_positions.x - delta_position;
-              break;
-              break;
+                printf("Reset desired_positions to current position (raw vicon)\n");
+                Vicon current_position;
+                get_vicon_data(usb_xbee, current_position);
+                desired_positions.x = current_position.x;
+                desired_positions.y = current_position.y;
+                desired_positions.z = current_position.z;
+                break;
 
             case 'k':
             case 'K':
-              printf("Decrease X desired_positions\n");
-              desired_positions.x = desired_positions.x - delta_position;
-              break;
-
+                printf("Increase kp_phi and kp_theta\n");
+                gains.kp_phi   = gains.kp_phi   + 0.1;
+                gains.kp_theta = gains.kp_theta + 0.1;
+                break;
+                
             case 'l':
             case 'L':
-              printf("Increase Y desired_positions\n");
-              desired_positions.y = desired_positions.y + delta_position;
-              break;
-
-              // skip q/Q - this is quit
-            case 'm':
-            case 'M':
-              printf("Decrease Y desired_positions\n");
-              desired_positions.y = desired_positions.y - delta_position;
-              break;
-
-            case 'n':
-            case 'N':
-              printf("Increase Z desired_positions\n");
-              desired_positions.z = desired_positions.z + delta_position;
-              break;
-
-            case 'o':
-            case 'O':
-              printf("Decrease Z desired_positions\n");
-              desired_positions.z = desired_positions.z - delta_position;
-              break;
-            
-            //  printf("Control Landing: Not Implemented\n");
+                printf("Decrease kp_phi and kp_theta\n");
+                gains.kp_phi   = gains.kp_phi   - 0.1;
+                gains.kp_theta = gains.kp_theta - 0.1;
+                break;
+                
+              //used after j: s,w,r,f,v
+              
+              //  printf("Control Landing: Not Implemented\n");
               //t_landing = t;
               //CTRL_LANDING = true;
 
@@ -211,8 +223,8 @@ void *control_stabilizer(void *thread_id){
        
         //get vicon data
 	   // get_vicon_data(usb_xbee, new_vicon);
-        new_vicon.x = 2;
-        //filter vicon data
+        
+       //filter vicon data
         new_filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
 
         //calc velocities from vicon
@@ -248,7 +260,7 @@ void *control_stabilizer(void *thread_id){
           // and send via i2c 
         set_forces(U,Ct,d);
         
-        if(DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles, times); }
+        if(DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles, times, time_m); }
   
     }
   
@@ -289,12 +301,15 @@ State_Error error_vicon(State_Error& error, const Vicon& pos_filt, const Vicon& 
 void *motor_signal(void *thread_id){
 
   printf("INSIDE MOTOR_SIGNAL\n");
-   
+   set_initial_times(time_m);
+
       while(SYSTEM_RUN){
 	motor_1.send_force_i2c();
 	motor_2.send_force_i2c();
 	motor_3.send_force_i2c();
 	motor_4.send_force_i2c();
+    
+   time_calc(time_m);
 	//send at about 200Hz
 	usleep(200);
 	}
@@ -414,12 +429,10 @@ Vicon vicon_velocity(Vicon& current, Vicon& old){
 }
 
 
-void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles, const Times& times){
+void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles, const Times& times, const Times& time_m){
    // system("clear");
     clear();//function in curses library  
-    printf("IN DISPLAY_INFO\n");
     printf("<==========================================>\n");   	
-    printf("Controller ON \n");
         printf("    IMU DATA (degrees)    \n");
         printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
         printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
@@ -474,9 +487,10 @@ void display_info(const State& imu_data, const State_Error& vicon_error, const S
         printf("motor_3: %.2i  ", motor_3.get_force());
         printf("motor_4: %.2i \n\n", motor_4.get_force());
 
-    printf("    delta_t (s)     \n");
-        printf("timestep: %.6f  ", tv2float(times.delta));
-    
+    printf("    time info     \n");
+        printf("Controller timestep (s)       : %.6f \n ", tv2float(times.delta));
+        printf("Controller loop frequency (Hz): %.3f \n ", 1/tv2float(times.delta));
+        printf("Motor loop frequency (Hz)     : %.3f \n ", 1/tv2float(time_m.delta));
 
 
     refresh();//refreshes shell console to output this text
@@ -552,6 +566,6 @@ int main(void){
 
     configure_threads();
 
-	return 0;
+    return 0;
 }
 
