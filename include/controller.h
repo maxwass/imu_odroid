@@ -27,6 +27,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <curses.h>
+#include <ncurses.h>
 
 #define NUM_THREADS 3
 #define PI 3.14159265359
