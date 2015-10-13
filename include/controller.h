@@ -32,10 +32,22 @@
 #define NUM_THREADS 3
 #define PI 3.14159265359
 
-
+//To comply with NCURSES create macro to go back and forth between printf and required printw 
+#define printf(...) printw(__VA_ARGS__)
 //=================================
 
 
+double Ct=0.013257116418667*10;
+double d=0.169;
+//signal frequency = 1/frequency = frequency in Hz
+int onesecond = 1000000;
+int frequency = 200;
+int signal_frequency = onesecond/frequency;
+float delta_position = 0.1;
+int max_thrust = 460;
+int delta_thrust = 30;
+//The address of i2c                                                                                                                                                                                        
+int address[4] = {0x2b, 0x2a, 0x2c, 0x29};
 
 
 //function prototypes
@@ -47,23 +59,77 @@ void start_motors(void);
 void stop_motors(void);
 void controller_on_off(bool& CONTROLLER_RUN);
 void display_on_off(bool& DISPLAY_RUN);
-void set_Utrim(Control_command& U_trim);
-void set_gains(Gains& gains);
-void set_initial_times(Times& times);
-void set_initial_positions(Positions& init_positions);
-void set_timespec(timespec& x, timespec& y);
-void time_calc(Times& times);
-timespec diff(timespec start,timespec end);
 State_Error error_vicon(State_Error& error, const Vicon& pos_filt, const Vicon& vel_filt, const Positions& desired_positions, const Times& times);
 Angles angles(const State_Error& error, const Gains& gains);
-double tv2float (const timespec& time);
 State error_imu(const State& imu_data, const Angles& desired_angles);
 Control_command thrust(const State& imu_error, const State_Error& vicon_error, const Control_command& U_trim, const Gains& gains);
 void set_forces(const Control_command& U, double Ct, double d);
 Vicon vicon_velocity(Vicon& current, Vicon& old);
-void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles);
+void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles, const Times& times);
 void configure_threads(void);
 
+double tv2float (const timespec& time){
+     return ((double) time.tv_sec + (time.tv_nsec / 1000000000.0));
+}
+void set_timespec(timespec& x, timespec& y){
+//set x to equal y
+             x.tv_sec = y.tv_sec;
+             x.tv_nsec = y.tv_nsec;
+}
+timespec diff(timespec start, timespec end){
+     timespec temp;
+     if ((end.tv_nsec-start.tv_nsec)<0) {
+         temp.tv_sec = end.tv_sec-start.tv_sec-1;
+         temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+     } else {  
+         temp.tv_sec = end.tv_sec-start.tv_sec;
+         temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+     }
+     return temp;
+}
+void time_calc(Times& times){
+    //get current time, swap current and past, calc delta_t
+    //printf("current time: %.8f  old time: %.8f  delta_t: %.8f\n", tv2float(times.current), tv2float(times.old), tv2float(times.delta));
+ 
+    //update current time
+    clock_gettime(CLOCK_REALTIME,&(times.current));
+    times.delta = diff(times.old, times.current);
+
+    //shift times back: set time_old_old to time_old
+    set_timespec(times.old_old, times.old);
+
+    //set time_old to current time
+    set_timespec(times.old, times.current);
+
+}
+void set_initial_times(Times& times){                                                                                                                                                                       
+        clock_gettime(CLOCK_REALTIME,&(times.current));
+        clock_gettime(CLOCK_REALTIME,&(times.old));
+        clock_gettime(CLOCK_REALTIME,&(times.old_old));
+        clock_gettime(CLOCK_REALTIME,&(times.delta));
+}
+void set_gains(Gains& gains){
+    gains.kp_theta = 5.5;
+    gains.kd_theta = 0.32;
+     
+    gains.kp_phi = 5.5;
+    gains.kd_phi = 0.32;
+     
+    gains.kp_psi = 5.2;
+    gains.kd_psi = 0.3; 
+ 
+    gains.kp_x = 19.5;
+    gains.kd_x = 2.7;
+    gains.ki_x = .05;
+ 
+    gains.kp_y = gains.kp_x;
+    gains.kd_y = gains.kd_x;
+    gains.ki_y = gains.ki_x;
+
+    gains.kp_z = 12.0;
+    gains.kd_z = 5.0;
+    gains.ki_z = 5.0;
+}
 
 #endif 
 // __CONTROLLER_H_INCLUDED__
