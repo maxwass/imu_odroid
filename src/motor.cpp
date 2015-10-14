@@ -19,24 +19,30 @@ motor::motor(int motor_id, int i2c_address)
     this -> motor_id = motor_id;
     this -> i2c_address = i2c_address;
     i2c_handle = open_i2c();
-    
 }
 
 void motor::set_force( int force_in, bool CONTROLLER_RUN )
 { //when setting force, check that ...
     //the motors are allowed to run (CONTROLLER_RUN flag is true)
     //the force is within acceptable bounds
-    if(CONTROLLER_RUN) { 
-        force = ensure_valid_force(force_in);
-        send_force_i2c();
-    }
-    else{ shut_down(); }
 
+    //obtain lock
+   boost::unique_lock<boost::mutex> scoped_lock(mutex_force);
+    
+    if(CONTROLLER_RUN) force = ensure_valid_force(force_in);
+    else force = 0; 
 
+//           if(CONTROLLER_RUN) { 
+//        force = ensure_valid_force(force_in);
+//        send_force_i2c();
+//    }
+//    else{ shut_down(); }
 }
  
-uint8_t motor::get_force( void )
-{ return force; }
+uint8_t* motor::get_force( void )
+{  boost::unique_lock<boost::mutex> scoped_lock(mutex_force);
+   return &force;
+}
 
 int motor::ensure_valid_force(int force_in)
 {   //check if requested force of this motor is in the acceptable bounds
@@ -45,11 +51,6 @@ int motor::ensure_valid_force(int force_in)
     if(force_in < min_force) {return min_force;}
     return force_in;
 }
-
-void motor::shut_down(void)
-{ force = 0;
-   send_force_i2c();
- }
 
 int motor::which_motor(void){
 	return motor_id;
@@ -63,7 +64,9 @@ void motor::send_force_i2c(void){
         //write() writes up to count bytes from the buffer 
         //pointed buf to the file referred to by the file 
         //descriptor fd.
-    int success_write = write(i2c_handle, &force, 1);//add &force back
+    //uint8_t f = this->get_force();
+
+    int success_write = write(i2c_handle, (this->get_force()), 1);//add &force back
 
     if(success_write < 0) {
         cout << "Failed to write to motor: " << motor_id << endl;

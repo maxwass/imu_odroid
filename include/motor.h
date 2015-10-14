@@ -14,9 +14,9 @@
 #include <unistd.h>
 #include <stdint.h>
 
+#include <boost/thread/mutex.hpp>
+
 using namespace std;
-
-
 
 class motor
 {
@@ -27,12 +27,12 @@ class motor
       uint8_t force; //8 bit int
       const static uint8_t max_force = 255;
       const static uint8_t min_force = 0;
+      boost::mutex mutex_force;
 
    public:
    	motor(int motor_id, int i2c_address);  // This is the constructor
       void set_force( int force_in, bool CONTROLLER_RUN );
-      uint8_t get_force( void );
-      void shut_down(void);
+      uint8_t* get_force( void );
       int which_motor(void);
       void send_force_i2c(void);
       int i2c_handle;
