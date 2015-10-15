@@ -17,7 +17,8 @@
 //file io
 #include <iostream>
 #include <fstream>
-
+#include <sstream>
+#include <iomanip>
 #include <queue>
 #include <string>
 #include "data_structs.h"
@@ -27,17 +28,19 @@ using namespace std;
 class logger
 {
    private:
+      ofstream myfile;
       std::queue<Vicon> q;
       int max_queue_length;
       string filename;
       const char *filename_p;
-      int file_descriptor;
-      ofstream myfile;
 
    public:
     logger(string filename);  // This is the constructor
     void log(Vicon v);
     void write_to_file(void);
+    template <typename num> const char* num2str(num f, int num_digits);
+    template <typename num> string num2str_1(num f);
+    
 };
  
 
