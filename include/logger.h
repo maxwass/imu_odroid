@@ -28,17 +28,17 @@ using namespace std;
 class logger
 {
    private:
-      ofstream myfile;
-      std::queue<Data_log> q;
-      int max_queue_length;
-      string filename;
-      const char *filename_p;
+    ofstream myfile;
+    std::queue<Data_log> q;
+    int max_queue_length;
+    std::string filename;
+    const char *filename_p;
+    void unwrap(Data_log d);
 
    public:
-    logger(string filename, int cycles_until_log);  // This is the constructor
+    logger(std::string filename, int cycles_until_log);  // This is the constructor
     void log(Data_log d);
     void write_to_file(void);
-    void unwrap(Data_log d);
     template <typename num> string num2str(num f);
     
 };

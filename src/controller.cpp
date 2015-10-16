@@ -1,8 +1,11 @@
 #include "controller.h"
-// compiling: g++ controller.cpp -I ~/Desktop/quadrotor/imu_odroid/include/
-//g++ controller.cpp vicon.cpp motor.cpp imu.cpp -I ~/Desktop/quadrotor/imu_odroid/include/ -lpthread -lncurses
+
+//g++ controller.cpp vicon.cpp motor.cpp imu.cpp logger.cpp -I ~/Desktop/quadrotor/imu_odroid/include/ -lpthread -lncurses -lboost_system
 
 //initialize process-scoped data-structures
+std::string log_filename = "file.log";
+logger logger(log_filename, 100);
+
 Times times;
 Times time_m;
 
@@ -14,6 +17,7 @@ Control_command U_trim = {0.0};
 bool SYSTEM_RUN = true;
 bool CONTROLLER_RUN = true;
 bool DISPLAY_RUN = false;
+bool LOG_DATA = true;
 
 int i2cHandle, usb_imu, usb_xbee;
 
@@ -199,7 +203,8 @@ void *control_stabilizer(void *thread_id){
 
     //for error calculations PID: stores the actual errors, not gains
     State_Error vicon_error = {0.0};
-    vicon_error.z.integral = 0;
+    //vicon_error.zdd.integral = 0;
+    
     //position from raw data
     Vicon new_vicon,          old_vicon,          old_old_vicon          = {0};  
     Vicon new_filt_vicon,     old_filt_vicon,     old_old_filt_vicon     = {0};
@@ -222,7 +227,7 @@ void *control_stabilizer(void *thread_id){
         time_calc(times);    
        
         //get vicon data
-	   // get_vicon_data(usb_xbee, new_vicon);
+        //get_vicon_data(usb_xbee, new_vicon);
         
        //filter vicon data
         new_filt_vicon = filter_vicon_data(new_vicon, old_vicon, old_old_vicon, weights);
@@ -242,7 +247,6 @@ void *control_stabilizer(void *thread_id){
         pushback(new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel);
 
         //saturate vicon velocities in calculations
-       
 
         //calculate error from vicon
         error_vicon(vicon_error, new_filt_vicon, new_filt_vicon_vel, desired_positions,times);
@@ -260,6 +264,14 @@ void *control_stabilizer(void *thread_id){
           // and send via i2c 
         set_forces(U,Ct,d);
         
+
+        if (LOG_DATA) { 
+            Data_log d;
+            d.vicon  = new_filt_vicon;
+            d.imu    = imu_data;
+            logger.log(d);
+        }
+
         if(DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles, times, time_m); }
   
     }
@@ -310,7 +322,7 @@ void *motor_signal(void *thread_id){
 	motor_4.send_force_i2c();
     
    time_calc(time_m);
-	//send at about 200Hz
+	//send at about 500Hz
 	usleep(200);
 	}
 
@@ -349,10 +361,10 @@ void start_motors(void){
 }
 void stop_motors(void){
     printf("Stopping Motors ...\n");
-    motor_1.shut_down();
-    motor_2.shut_down();
-    motor_3.shut_down();
-    motor_4.shut_down();
+    motor_1.set_force(0, false);
+    motor_2.set_force(0, false);
+    motor_3.set_force(0, false);
+    motor_4.set_force(0, false);
 }
 void controller_on_off(bool &CONTROLLER_RUN){
     if(CONTROLLER_RUN == false){
@@ -439,14 +451,14 @@ void display_info(const State& imu_data, const State_Error& vicon_error, const S
         printf("psi: %.2f         psi dot: %.2f\n\n",imu_data.psi, imu_data.psi_dot);
 
 	printf("    vicon data    \n");
-        printf("phi: %.2f         x: %.2f\n", vicon.phi, vicon.x);
-        printf("theta: %.2f       y: %.2f\n",vicon.theta, vicon.y);
-        printf("psi: %.2f         z: %.2f\n\n",vicon.psi, vicon.z);
+        printf("phi: %.5f         x: %.5f\n", vicon.phi, vicon.x);
+        printf("theta: %.5f       y: %.5f\n",vicon.theta, vicon.y);
+        printf("psi: %.5f         z: %.5f\n\n",vicon.psi, vicon.z);
     
  	printf("   filtered vicon data    \n");
-        printf("phi: %.2f         x: %.2f\n", vicon_filt.phi, vicon_filt.x);
-        printf("theta: %.2f       y: %.2f\n",vicon_filt.theta, vicon_filt.y);
-        printf("psi: %.2f         z: %.2f\n\n",vicon_filt.psi, vicon_filt.z);
+        printf("phi: %.5f         x: %.5f\n", vicon_filt.phi, vicon_filt.x);
+        printf("theta: %.5f       y: %.5f\n",vicon_filt.theta, vicon_filt.y);
+        printf("psi: %.5f         z: %.5f\n\n",vicon_filt.psi, vicon_filt.z);
  
     printf("    vicon velocity    \n");
         printf("phi_dot: %.2f         x_dot: %.2f\n", vicon_vel.phi, vicon_vel.x);
@@ -482,10 +494,10 @@ void display_info(const State& imu_data, const State_Error& vicon_error, const S
 	    printf("thrust: %f \n\n", U.thrust);
 
     printf("    FORCES (0-255)     \n");
-        printf("motor_1: %.2i  ", motor_1.get_force());
-        printf("motor_2: %.2i  ", motor_2.get_force());
-        printf("motor_3: %.2i  ", motor_3.get_force());
-        printf("motor_4: %.2i \n\n", motor_4.get_force());
+        printf("motor_1: %.5i  ", *(motor_1.get_force()));
+        printf("motor_2: %.5i  ", *(motor_2.get_force()));
+        printf("motor_3: %.5i  ", *(motor_3.get_force()));
+        printf("motor_4: %.5i \n\n", *(motor_4.get_force()));
 
     printf("    time info     \n");
         printf("Controller timestep (s)       : %.6f \n ", tv2float(times.delta));
@@ -558,14 +570,15 @@ void configure_threads(void){
 
 int main(void){
 	//intialize desired angles, gains, U_trim, & open port ot xbee and imu
-	init();
-    
-    printf("\n PRESS 'a' or 'A' TO START\n");
+	
+   // if (openlog(NULL, LOG_NDELAY, LOG_DEBUG)) printf("SUCCESSFULLY OPENED LOG FILE");                                                    
+   // else ("UNSUCCESFULLY OPENED LOG FILE");
 
+    init();
+    
 	usleep(onesecond);
 
     configure_threads();
-
     return 0;
 }
 

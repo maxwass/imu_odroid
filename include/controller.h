@@ -9,6 +9,7 @@
 #include "imu.h"
 #include "data_structs.h" // user defined structs (state, control_command,gains, desired_angles)
 #include "vicon.h" //DELETE THIS ONCE INTERPROCESS WORKS
+#include "logger.h"
 //#include "shared_data.hpp" //UNCOMMENT WHEN IMPLEMENTED
 
 
@@ -28,6 +29,8 @@
 #include <sys/time.h>
 #include <curses.h>
 #include <ncurses.h>
+#include <queue>
+#include <vector>
 
 #define NUM_THREADS 3
 #define PI 3.14159265359

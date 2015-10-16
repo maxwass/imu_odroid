@@ -4,7 +4,7 @@
 // Member functions definitions including constructor
 logger::logger(string filename, int cycles_until_log)
 {
-printf("opening file for logging: %s\n",filename.c_str());
+    printf("opening file for logging: %s\n",filename.c_str());
     //when queue gets larget than this, will flush all
     max_queue_length = cycles_until_log; 
     
@@ -69,7 +69,3 @@ for(int i = 0; i < 20; i++) logger.log(d);
 }
 */
 
-//string logger::data2csv(Vicon v)
-//{
-//String s = 
-//}
