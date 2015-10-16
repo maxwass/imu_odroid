@@ -29,17 +29,17 @@ class logger
 {
    private:
       ofstream myfile;
-      std::queue<Vicon> q;
+      std::queue<Data_log> q;
       int max_queue_length;
       string filename;
       const char *filename_p;
 
    public:
-    logger(string filename);  // This is the constructor
-    void log(Vicon v);
+    logger(string filename, int cycles_until_log);  // This is the constructor
+    void log(Data_log d);
     void write_to_file(void);
-    template <typename num> const char* num2str(num f, int num_digits);
-    template <typename num> string num2str_1(num f);
+    void unwrap(Data_log d);
+    template <typename num> string num2str(num f);
     
 };
  
