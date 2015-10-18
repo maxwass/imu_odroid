@@ -13,9 +13,10 @@ using namespace std;
 
 void get_vicon_data(int port, Vicon& vicon_data)
 {
-     //cout << "entering get_vicon_vicon_data" << endl;
+ 
+        //cout << "entering get_vicon_vicon_data" << endl;
     tcflush(usb_xbee_fd,TCIFLUSH); 
-    float data_received[6];
+    float data_received[6] = {0.0};
     //XBee_receive_float(usb_xbee_fd,data_received,6); //Daewons function from receiver.h
     recieve_data(port, data_received,6);
     unpack_data(vicon_data, data_received);

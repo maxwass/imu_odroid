@@ -74,6 +74,9 @@ int open_imu_port()
 
 void print_data(const State& imu_data)
 {
+
+    printf("theta: %f  phi: %f  psi: %f\n  theta_dot: %f  phi_dot: %f  psi_dot: %f\n\n", imu_data.theta, imu_data.theta, imu_data.psi, imu_data.theta_dot, imu_data.phi_dot, imu_data.psi_dot);    
+/*
     cout << "theta:      " << imu_data.theta;
     cout << "  phi:    " << imu_data.phi;
     cout << "   psi: " << imu_data.psi << endl;
@@ -81,6 +84,7 @@ void print_data(const State& imu_data)
     cout << "     phi_dot: " << imu_data.phi_dot;
     cout << "     psi_dot: " << imu_data.psi_dot << endl;
     cout << endl << endl;
+*/
 }
 
 void unpack_data(State& imu_data, const unsigned char arr[]){
@@ -104,7 +108,7 @@ void unpack_data(State& imu_data, const unsigned char arr[]){
 void get_imu_data(const int port, State& imu_data)
 {
     //cout << "entering get_imu_data" << endl;
-    
+   // printf("\nIS MACRO WORKING\n");
     unsigned char sensor_bytes2[24] = {0};
     
     //flush input buffer (TCI for input)

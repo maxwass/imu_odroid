@@ -104,7 +104,6 @@ void *control_stabilizer(void *thread_id){
         //calculate the forces of each motor and change force on motor objects
           // and send via i2c 
         set_forces(U,Ct,d);
-        
 
         if (LOG_DATA)    { log_data(times, new_vicon, new_vicon_vel, new_filt_vicon, new_filt_vicon_vel, vicon_error, imu_data, imu_error, desired_angles);        }
         if (DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles, times, time_m); }
@@ -120,8 +119,6 @@ Angles angles(const State_Error& error, const Gains& gains){
        // phi_d =   kp_g*ey + ki_g*ey_i - kd_g*vel_filtered[1];
        // theta_d =  - kp_g*ex - ki_g*ex_i + kd_g*vel_filtered[0]
     a.psi = 0;
-   // printf("kp_y: %f  error.y.prop: %f    kd_y: %f error.y.deriv %f   ki_y: %f  error.y.integral: %f", gains.kp_y, error.y.prop, gains.kd_y, error.y.deriv,  gains.ki_y, error.y.integral);
-   // printf("kp_x: %f  error.x.prop: %f    kd_x: %f error.x.deriv %f   ki_x: %f  error.x.integral: %f", gains.kp_x, error.x.prop, gains.kd_x, error.x.deriv,  gains.ki_x, error.x.integral);
     a.phi     =  gains.kp_y*error.y.prop - gains.kd_y*error.y.deriv + gains.ki_y*error.y.integral;
     a.theta   = -gains.kp_x*error.x.prop + gains.kd_x*error.x.deriv - gains.ki_x*error.x.integral;
 return a;
@@ -129,20 +126,20 @@ return a;
 }
 State_Error error_vicon(State_Error& error, const Vicon& pos_filt, const Vicon& vel_filt, const Positions& desired_positions, const Times& times){
        
-        //proportional errors:  desired_positions - filtered_positions
-        error.x.prop = desired_positions.x - pos_filt.x;
-        error.y.prop = desired_positions.y - pos_filt.y;
-        error.z.prop = desired_positions.z - pos_filt.z;
+    //proportional errors:  desired_positions - filtered_positions
+    error.x.prop = desired_positions.x - pos_filt.x;
+    error.y.prop = desired_positions.y - pos_filt.y;
+    error.z.prop = desired_positions.z - pos_filt.z;
        
-        //derivative errors: desired_velocities - filtered_velocities
-        error.x.deriv = 0 - vel_filt.x;
-        error.y.deriv = 0 - vel_filt.y;
-        error.z.deriv = 0 - vel_filt.z;
+    //derivative errors: desired_velocities - filtered_velocities
+    error.x.deriv = 0 - vel_filt.x;
+    error.y.deriv = 0 - vel_filt.y;
+    error.z.deriv = 0 - vel_filt.z;
        
-        //integral errors: integral error + (proportional error * delta_t)
-        error.x.integral = error.x.integral + (error.x.prop * tv2float(times.delta));
-        error.y.integral = error.y.integral + (error.y.prop * tv2float(times.delta));
-        error.z.integral = error.z.integral + (error.z.prop * tv2float(times.delta));
+    //integral errors: integral error + (proportional error * delta_t)
+    error.x.integral = error.x.integral + (error.x.prop * tv2float(times.delta));
+    error.y.integral = error.y.integral + (error.y.prop * tv2float(times.delta));
+    error.z.integral = error.z.integral + (error.z.prop * tv2float(times.delta));
 
 }
 void *motor_signal(void *thread_id){
@@ -278,24 +275,19 @@ void log_data(const Times& times, const Vicon& new_vicon, const Vicon& new_vicon
 
     Data_log d;
     d.time   = times;
-        
     d.vicon_data      = new_vicon;
     d.vicon_vel       = new_vicon_vel;
-
     d.vicon_data_filt = new_filt_vicon;
     d.vicon_vel_filt  = new_filt_vicon_vel;
-
     d.vicon_error     = vicon_error;
-
     d.imu             = imu_data;
     d.imu_error       = imu_error;
-
     d.forces.motor_1  = *(motor_1.get_force());
     d.forces.motor_2  = *(motor_2.get_force());
     d.forces.motor_3  = *(motor_3.get_force());
     d.forces.motor_4  = *(motor_4.get_force());
-            
-    d.desired_angles = desired_angles;
+    d.desired_angles  = desired_angles;
+    
     logger.log(d);
 }
 void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles, const Times& times, const Times& time_m){
@@ -353,7 +345,7 @@ printf("psi_dot:  %10.2f       z_dot: %10.2f                  psi_dot:   %10.2f 
        // printf("%lld.%.9ld", (long long)times.current.tv_sec, times.current.tv_nsec);
         printf("Time Date                     :    %s\n ", times.date_time);
 
-              refresh();//refreshes shell console to output this text
+        refresh();//refreshes shell console to output this text
 }
 
 //executes input from host computer on motors, controller gains, displays, and controller
@@ -580,9 +572,6 @@ void configure_threads(void){
 
 int main(void){
 	//intialize desired angles, gains, U_trim, & open port ot xbee and imu
-	
-   // if (openlog(NULL, LOG_NDELAY, LOG_DEBUG)) printf("SUCCESSFULLY OPENED LOG FILE");                                                    
-   // else ("UNSUCCESFULLY OPENED LOG FILE");
 
     init();
     
