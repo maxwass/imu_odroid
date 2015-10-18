@@ -106,31 +106,9 @@ void *control_stabilizer(void *thread_id){
         set_forces(U,Ct,d);
         
 
-        if (LOG_DATA) {
-            Data_log d;
-            d.time   = times;
-        
-            d.vicon_data      = new_vicon;
-            d.vicon_vel       = new_vicon_vel;
+        if (LOG_DATA)    { log_data(times, new_vicon, new_vicon_vel, new_filt_vicon, new_filt_vicon_vel, vicon_error, imu_data, imu_error, desired_angles);        }
 
-            d.vicon_data_filt = new_filt_vicon;
-            d.vicon_vel_filt  = new_filt_vicon_vel;
-
-            d.vicon_error     = vicon_error;
-
-            d.imu             = imu_data;
-            d.imu_error       = imu_error;
-
-            d.forces.motor_1  = *(motor_1.get_force());
-            d.forces.motor_2  = *(motor_2.get_force());
-            d.forces.motor_3  = *(motor_3.get_force());
-            d.forces.motor_4  = *(motor_4.get_force());
-            
-            d.desired_angles = desired_angles;
-            logger.log(d);
-        }
-
-        if(DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles, times, time_m); }
+        if (DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles, times, time_m); }
   
     }
   
@@ -297,8 +275,30 @@ Vicon vicon_velocity(Vicon& current, Vicon& old){
 
     return velocity;    
 }
+void log_data(const Times& times, const Vicon& new_vicon, const Vicon& new_vicon_vel, const Vicon& new_filt_vicon, const Vicon& new_filt_vicon_vel, const State_Error& vicon_error, const State& imu_data, const State& imu_error, const Angles& desired_angles){
 
+    Data_log d;
+    d.time   = times;
+        
+    d.vicon_data      = new_vicon;
+    d.vicon_vel       = new_vicon_vel;
 
+    d.vicon_data_filt = new_filt_vicon;
+    d.vicon_vel_filt  = new_filt_vicon_vel;
+
+    d.vicon_error     = vicon_error;
+
+    d.imu             = imu_data;
+    d.imu_error       = imu_error;
+
+    d.forces.motor_1  = *(motor_1.get_force());
+    d.forces.motor_2  = *(motor_2.get_force());
+    d.forces.motor_3  = *(motor_3.get_force());
+    d.forces.motor_4  = *(motor_4.get_force());
+            
+    d.desired_angles = desired_angles;
+    logger.log(d);
+}
 void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles, const Times& times, const Times& time_m){
    // system("clear");
     clear();//function in curses library  

@@ -60,30 +60,31 @@ std::string s(ss.str());
 return s;
 }
 void logger::format(Times t){
-//myfile <<      << ", " << tv2float(times.delta)
+    myfile << (t.date_time) ;//<< ", "; //<< t.delta;    
+        //myfile <<      << ", " << tv2float(times.delta)
 }
 void logger::format(Vicon v){
-myfile <<  num2str(v.x) <<  ", " << num2str(v.y) << ", " << num2str(v.z) << ", " << num2str(v.theta) <<  ", " << num2str(v.phi) << ", " << num2str(v.psi);
+    myfile <<  num2str(v.x) <<  ", " << num2str(v.y) << ", " << num2str(v.z) << ", " << num2str(v.theta) <<  ", " << num2str(v.phi) << ", " << num2str(v.psi);
 }
 void logger::format(State_Error se){
-format(se.x);     myfile << ", ";
-format(se.y);     myfile << ", ";
-format(se.z);     myfile << ", ";
-format(se.theta); myfile << ", ";
-format(se.phi);   myfile << ", ";
-format(se.psi);  //comma added in main function
+    format(se.x);     myfile << ", ";
+    format(se.y);     myfile << ", ";
+    format(se.z);     myfile << ", ";
+    format(se.theta); myfile << ", ";
+    format(se.phi);   myfile << ", ";
+    format(se.psi);  //comma added in main function
 }
 void logger::format(Errors e){
-myfile <<  num2str(e.prop) <<  ", " << num2str(e.deriv) << ", " << num2str(e.integral);
+    myfile <<  num2str(e.prop) <<  ", " << num2str(e.deriv) << ", " << num2str(e.integral);
 }
 void logger::format(State imu){
-myfile <<  num2str(imu.theta) <<  ", " << num2str(imu.phi) << ", " << num2str(imu.psi) << ", " <<num2str(imu.theta_dot)<<  ", " <<num2str(imu.phi_dot)<< ", "<< num2str(imu.psi_dot);
+    myfile <<  num2str(imu.theta) <<  ", " << num2str(imu.phi) << ", " << num2str(imu.psi) << ", " <<num2str(imu.theta_dot)<<  ", " <<num2str(imu.phi_dot)<< ", "<< num2str(imu.psi_dot);
 }
 void logger::format(Motor_forces mf){
-myfile << num2str(mf.motor_1) << ", " << num2str(mf.motor_2) << ", " << num2str(mf.motor_3) << ", " << num2str(mf.motor_4);
+    myfile << num2str(mf.motor_1) << ", " << num2str(mf.motor_2) << ", " << num2str(mf.motor_3) << ", " << num2str(mf.motor_4);
 }
 void logger::format(Angles a){
-myfile << num2str(a.theta) << ", " << num2str(a.phi) << ", " << num2str(a.psi);
+    myfile << num2str(a.theta) << ", " << num2str(a.phi) << ", " << num2str(a.psi);
 }
 
 
