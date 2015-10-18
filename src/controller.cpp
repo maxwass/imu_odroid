@@ -35,164 +35,6 @@ motor motor_4(4, address[3]);
 //shared_data<Angles> des_angles("ang_mem_loc",DES_ANGLE. "create");
 
 
-//executes input from host computer on motors, controller gains, displays, and controller
-void *command_input(void *thread_id){
-   
-    printf("INSIDE COMMAND_INPUT");
-    unsigned char command;
-    string input;
-
-    while(SYSTEM_RUN) {
-	    printf("    please give input for command_input: ");
-        //command = getchar(); 
-        //getline(cin, input);
-        command = getch();
-        printf("input: %i \n", command);
-        switch (command) {
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-                start_motors();
-                break;
-                
-            case '5':
-            case 'q':
-            case 'Q':
-                printf("Motor Stop!\n");
-                stop_motors();
-                CONTROLLER_RUN = false;//change to System Run!
-                endwin();
-                break;
-                
-            case ' ':
-            case 'z':
-            case 'Z':
-            case '\n':
-                controller_on_off(CONTROLLER_RUN);
-                break;
-
-// control of desired positions
-            case 'w':
-            case 'W':
-	          printf("Increase X desired_positions\n");
-              desired_positions.x = desired_positions.x + delta_position;
-                break; 
-    
-            case 's':
-            case 'S':
-	          printf("Decrease X desired_positions\n");
-              desired_positions.x = desired_positions.x - delta_position;
-                break; 
-            
-            case 'd':
-            case 'D':
-              printf("Increase Y desired_positions\n");
-              desired_positions.y = desired_positions.y + delta_position;
-              break;
-
-            case 'a':
-            case 'A':
-              printf("Decrease Y desired_positions\n");
-              desired_positions.y = desired_positions.y - delta_position;
-                break;
-
-            case 'r':
-            case 'R':
-              printf("Decrease Z desired_positions\n");
-              desired_positions.z = desired_positions.z - delta_position;
-                break;
-
-            case 'f':
-            case 'F':
-              printf("Increase Z desired_positions\n");
-              desired_positions.z = desired_positions.z + delta_position;
-                 break;
-
-// control of desired positions
-
-            case 'b':
-            case 'B':
-                display_on_off(DISPLAY_RUN);
-               // system("clear");
-               //clear(); //function in curses library
-                break;
-                
-            case 'c':
-            case 'C':
-                if((U_trim.thrust + delta_thrust) >=  max_thrust) {
-                  printf("Maximum Thrust Reached: Cannot Increase Thrust\n");
-                  U_trim.thrust = max_thrust;}
-                else {U_trim.thrust += delta_thrust; 
-                     printf("Increase Thrust: %f\n", U_trim.thrust);}
-              break;
-                
-            case 'v':
-            case 'V':
-                if((U_trim.thrust-=delta_thrust) <= 0) {
-                printf("Thrust is 0. Cannot decrease further\n");
-                U_trim.thrust = 0;}
-                else {U_trim.thrust -= delta_thrust;
-                      printf("Decrease Thrust: %f\n", U_trim.thrust);}
-              break;
-                
-            case 'g':
-            case 'G':
-                printf("Increase kd_phi and kd_theta\n");
-                gains.kd_phi   = gains.kd_phi   + 0.3;
-                gains.kd_theta = gains.kd_theta + 0.3;
-                break;
-                
-            case 'h':
-            case 'H':
-                printf("Decrease kd_phi and kd_theta\n");
-                gains.kd_phi   = gains.kd_phi   - 0.3;
-                gains.kd_theta = gains.kd_theta - 0.3;
-                break;
-                
-            case 'i':
-            case 'I':
-              printf("Reset Desired_positions to initial values\n");
-              desired_positions.x = init_positions.x;
-              desired_positions.y = init_positions.y;
-              desired_positions.z = init_positions.z;
-              break;
-            
-            case 'j':
-            case 'J':
-                printf("Reset desired_positions to current position (raw vicon)\n");
-                Vicon current_position;
-                get_vicon_data(usb_xbee, current_position);
-                desired_positions.x = current_position.x;
-                desired_positions.y = current_position.y;
-                desired_positions.z = current_position.z;
-                break;
-
-            case 'k':
-            case 'K':
-                printf("Increase kp_phi and kp_theta\n");
-                gains.kp_phi   = gains.kp_phi   + 0.1;
-                gains.kp_theta = gains.kp_theta + 0.1;
-                break;
-                
-            case 'l':
-            case 'L':
-                printf("Decrease kp_phi and kp_theta\n");
-                gains.kp_phi   = gains.kp_phi   - 0.1;
-                gains.kp_theta = gains.kp_theta - 0.1;
-                break;
-                
-              //used after j: s,w,r,f,v
-              
-              //  printf("Control Landing: Not Implemented\n");
-              //t_landing = t;
-              //CTRL_LANDING = true;
-
-        }
-
-    }
-    pthread_exit(NULL);
-}
 void *control_stabilizer(void *thread_id){
  
     printf("INSIDE CONTROL_STABALIZER\n");
@@ -212,7 +54,6 @@ void *control_stabilizer(void *thread_id){
     //velocity from raw data
     Vicon new_vicon_vel,      old_vicon_vel,      old_old_vicon_vel      = {0};
     Vicon new_filt_vicon_vel, old_filt_vicon_vel, old_old_filt_vicon_vel = {0};
-
 
 //for display
     State imu_error = {0};
@@ -265,10 +106,27 @@ void *control_stabilizer(void *thread_id){
         set_forces(U,Ct,d);
         
 
-        if (LOG_DATA) { 
+        if (LOG_DATA) {
             Data_log d;
-            d.vicon  = new_filt_vicon;
-            d.imu    = imu_data;
+            d.time   = times;
+        
+            d.vicon_data      = new_vicon;
+            d.vicon_vel       = new_vicon_vel;
+
+            d.vicon_data_filt = new_filt_vicon;
+            d.vicon_vel_filt  = new_filt_vicon_vel;
+
+            d.vicon_error     = vicon_error;
+
+            d.imu             = imu_data;
+            d.imu_error       = imu_error;
+
+            d.forces.motor_1  = *(motor_1.get_force());
+            d.forces.motor_2  = *(motor_2.get_force());
+            d.forces.motor_3  = *(motor_3.get_force());
+            d.forces.motor_4  = *(motor_4.get_force());
+            
+            d.desired_angles = desired_angles;
             logger.log(d);
         }
 
@@ -312,7 +170,7 @@ State_Error error_vicon(State_Error& error, const Vicon& pos_filt, const Vicon& 
 }
 void *motor_signal(void *thread_id){
 
-  printf("INSIDE MOTOR_SIGNAL\n");
+   printf("INSIDE MOTOR_SIGNAL\n");
    set_initial_times(time_m);
 
       while(SYSTEM_RUN){
@@ -321,7 +179,7 @@ void *motor_signal(void *thread_id){
 	motor_3.send_force_i2c();
 	motor_4.send_force_i2c();
     
-   time_calc(time_m);
+    time_calc(time_m);
 	//send at about 500Hz
 	usleep(200);
 	}
@@ -445,70 +303,223 @@ void display_info(const State& imu_data, const State_Error& vicon_error, const S
    // system("clear");
     clear();//function in curses library  
     printf("<==========================================>\n");   	
-        printf("    IMU DATA (degrees)    \n");
-        printf("phi: %.2f         phi dot: %.2f\n", imu_data.phi, imu_data.phi_dot);
-        printf("theta: %.2f         theta dot: %.2f\n",imu_data.theta, imu_data.theta_dot);
-        printf("psi: %.2f         psi dot: %.2f\n\n",imu_data.psi, imu_data.psi_dot);
+        printf("        IMU DATA (degrees)    \n");
+        printf("phi:   %7.2f         phi dot:   %7.2f \n",imu_data.phi, imu_data.phi_dot, imu_data.phi, imu_data.phi_dot);
+        printf("theta: %7.2f         theta dot: %7.2f\n",imu_data.theta, imu_data.theta_dot);
+        printf("psi:   %7.2f         psi dot:   %7.2f\n\n",imu_data.psi, imu_data.psi_dot);
 
-	printf("    vicon data    \n");
-        printf("phi: %.5f         x: %.5f\n", vicon.phi, vicon.x);
-        printf("theta: %.5f       y: %.5f\n",vicon.theta, vicon.y);
-        printf("psi: %.5f         z: %.5f\n\n",vicon.psi, vicon.z);
+	printf("        VICON DATA                                                          FILTERED VICON DATA   \n");
+        printf("phi:      %10.2f       x: %10.2f                           phi:   %10.2f       x: %10.2f\n", vicon.phi, vicon.x, vicon_filt.phi, vicon_filt.x);
+        printf("theta:    %10.2f       y: %10.2f                           theta: %10.2f       y: %10.2f\n",vicon.theta, vicon.y, vicon_filt.theta, vicon_filt.y);
+        printf("psi:      %10.2f       z: %10.2f                           psi:   %10.2f       z: %10.2f\n\n",vicon.psi, vicon.z, vicon_filt.psi, vicon_filt.z);
+      
+    printf("        VICON VELOCITY                                                      FILTERED VICON VELOCITY  \n");
+printf("phi_dot:  %10.2f       x_dot: %10.2f                  phi_dot:   %10.2f      x_dot: %10.2f\n", vicon_vel.phi, vicon_vel.x,  vicon_vel_filt.phi, vicon_vel_filt.x);
+printf("theta_dot:%10.2f       y_dot: %10.2f                  theta_dot: %10.2f      y_dot: %10.2f\n",vicon_vel.theta, vicon_vel.y, vicon_vel_filt.theta, vicon_vel_filt.y);
+printf("psi_dot:  %10.2f       z_dot: %10.2f                  psi_dot:   %10.2f      z_dot: %10.2f\n\n",vicon_vel.psi, vicon_vel.z ,vicon_vel_filt.psi, vicon_vel_filt.z);
+
+    printf("        VICON ERRORS (meters)      \n");
+        printf("x_prop:   %10.2f      y_prop:  %10.2f       z_prop:  %10.2f\n", vicon_error.x.prop, vicon_error.y.prop, vicon_error.z.prop);
+        printf("x_deriv:  %10.2f      y_deriv: %10.2f       z_deriv: %10.2f\n", vicon_error.x.deriv, vicon_error.y.deriv, vicon_error.z.deriv);
+        printf("x_integ:  %10.2f      y_integ: %10.2f       z_integ: %10.2f\n\n", vicon_error.x.integral, vicon_error.y.integral, vicon_error.z.integral);
+
+    printf("        DESIRED ANGLES = f(vicon_error, gains)      \n");
+        printf("phi:      %10.2f\n", desired_angles.phi);
+        printf("theta:    %10.2f\n", desired_angles.theta);
+        printf("psi:      %10.2f\n\n", desired_angles.psi);
+
+    printf("        IMU ERRORS = f(imu_data, desired_angles) (radians)      \n");
+        printf("e_phi:    %10.2f\n", imu_error.phi);
+        printf("e_theta:  %10.2f\n", imu_error.theta);
+        printf("e_psi:    %10.2f\n\n", imu_error.psi);
     
- 	printf("   filtered vicon data    \n");
-        printf("phi: %.5f         x: %.5f\n", vicon_filt.phi, vicon_filt.x);
-        printf("theta: %.5f       y: %.5f\n",vicon_filt.theta, vicon_filt.y);
-        printf("psi: %.5f         z: %.5f\n\n",vicon_filt.psi, vicon_filt.z);
- 
-    printf("    vicon velocity    \n");
-        printf("phi_dot: %.2f         x_dot: %.2f\n", vicon_vel.phi, vicon_vel.x);
-        printf("theta_dot: %.2f       y_dot: %.2f\n",vicon_vel.theta, vicon_vel.y);
-        printf("psi_dot: %.2f         z_dot: %.2f\n\n",vicon_vel.psi, vicon_vel.z);
+    printf("        ACCELERATION (N/s^2)      \n");
+        printf("roll_acc:     %7.2f\n", U.roll_acc);
+        printf("pitch_acc:    %7.2f\n", U.pitch_acc);
+        printf("yaw_acc:      %7.2f\n\n", U.yaw_acc);
 
-    printf("   filtered vicon velocity    \n");
-        printf("phi_dot: %.2f         x_dot: %.2f\n", vicon_vel_filt.phi, vicon_vel_filt.x);
-        printf("theta_dot: %.2f       y_dot: %.2f\n",vicon_vel_filt.theta, vicon_vel_filt.y);
-        printf("psi_dot: %.2f         z_dot: %.2f\n\n",vicon_vel_filt.psi, vicon_vel_filt.z);
-
-    printf("  VICON ERRORS (meters)      \n");
-        printf("x_prop: %.2f      y_prop %.2f       z_prop %.2f\n", vicon_error.x.prop, vicon_error.y.prop, vicon_error.z.prop);
-        printf("x_deriv: %.2f      y_deriv %.2f       z_deriv %.2f\n", vicon_error.x.deriv, vicon_error.y.deriv, vicon_error.z.deriv);
-        printf("x_integ: %.2f      y_integ %.2f       z_integ %.2f\n\n", vicon_error.x.integral, vicon_error.y.integral, vicon_error.z.integral);
-
-    printf("     DESIRED ANGLES = f(vicon_error, gains)      \n");
-        printf("phi: %.2f\n", desired_angles.phi);
-        printf("theta: %.2f\n", desired_angles.theta);
-        printf("psi: %.2f\n\n", desired_angles.psi);
-
-    printf("  IMU ERRORS = f(imu_data, desired_angles) (radians)      \n");
-        printf("e_phi: %.2f\n", imu_error.phi);
-        printf("e_theta: %.2f\n", imu_error.theta);
-        printf("e_psi: %.2f\n\n", imu_error.psi);
-    
-    printf("     ACCELERATION (N/s^2)      \n");
-        printf("roll_acc: %.2f\n", U.roll_acc);
-        printf("pitch_acc: %.2f\n", U.pitch_acc);
-        printf("yaw_acc: %.2f\n\n", U.yaw_acc);
-
-	printf("    THRUST = Calc_Thrust + Trim_Thrust (0-255)     \n");
+	printf("        THRUST = Calc_Thrust + Trim_Thrust (0-255)     \n");
 	    printf("thrust: %f \n\n", U.thrust);
 
-    printf("    FORCES (0-255)     \n");
-        printf("motor_1: %.5i  ", *(motor_1.get_force()));
-        printf("motor_2: %.5i  ", *(motor_2.get_force()));
-        printf("motor_3: %.5i  ", *(motor_3.get_force()));
-        printf("motor_4: %.5i \n\n", *(motor_4.get_force()));
+    printf("        FORCES (0-255)     \n");
+        printf("motor_1: %i  ", *(motor_1.get_force()));
+        printf("motor_2: %i  ", *(motor_2.get_force()));
+        printf("motor_3: %i  ", *(motor_3.get_force()));
+        printf("motor_4: %i \n\n", *(motor_4.get_force()));
 
-    printf("    time info     \n");
-        printf("Controller timestep (s)       : %.6f \n ", tv2float(times.delta));
-        printf("Controller loop frequency (Hz): %.3f \n ", 1/tv2float(times.delta));
-        printf("Motor loop frequency (Hz)     : %.3f \n ", 1/tv2float(time_m.delta));
+    printf("        TIME INFO     \n");
+        printf("Controller timestep (s)       :     %7.4f\n", tv2float(times.delta));
+        printf("Controller loop frequency (Hz):     %5.3f\n", 1/tv2float(times.delta));
+        printf("Motor loop frequency (Hz)     :    %5.3f\n", 1/tv2float(time_m.delta));
+       // printf("%lld.%.9ld", (long long)times.current.tv_sec, times.current.tv_nsec);
+        printf("Time Date                     :    %s\n ", times.date_time);
 
-
-    refresh();//refreshes shell console to output this text
+              refresh();//refreshes shell console to output this text
 }
 
+//executes input from host computer on motors, controller gains, displays, and controller
+void *command_input(void *thread_id){
+   
+    printf("INSIDE COMMAND_INPUT");
+    unsigned char command;
+    string input;
 
+    while(SYSTEM_RUN) {
+	    printf("    please give input for command_input: ");
+        //command = getchar(); 
+        //getline(cin, input);
+        command = getch();
+        printf("input: %i \n", command);
+        switch (command) {
+            case '1':
+
+            case '4':
+                start_motors();
+                break;
+                
+            case '5':
+            case 'q':
+            case 'Q':
+                printf("Motor Stop!\n");
+                stop_motors();
+                CONTROLLER_RUN = false;//change to System Run!
+                endwin();
+                break;
+                
+            case ' ':
+            case 'z':
+            case 'Z':
+            case '\n':
+                controller_on_off(CONTROLLER_RUN);
+                break;
+
+// control of desired positions
+            case 'w':
+            case 'W':
+	          printf("Increase X desired_positions\n");
+              desired_positions.x = desired_positions.x + delta_position;
+                break; 
+    
+            case 's':
+            case 'S':
+	          printf("Decrease X desired_positions\n");
+              desired_positions.x = desired_positions.x - delta_position;
+                break; 
+            
+            case 'd':
+            case 'D':
+              printf("Increase Y desired_positions\n");
+              desired_positions.y = desired_positions.y + delta_position;
+              break;
+
+            case 'a':
+            case 'A':
+              printf("Decrease Y desired_positions\n");
+              desired_positions.y = desired_positions.y - delta_position;
+                break;
+
+            case 'r':
+            case 'R':
+              printf("Decrease Z desired_positions\n");
+              desired_positions.z = desired_positions.z - delta_position;
+                break;
+
+            case 'f':
+            case 'F':
+              printf("Increase Z desired_positions\n");
+              desired_positions.z = desired_positions.z + delta_position;
+                 break;
+
+// control of desired positions
+
+            case 'b':
+            case 'B':
+                display_on_off(DISPLAY_RUN);
+               // system("clear");
+               //clear(); //function in curses library
+                break;
+                
+            case 'c':
+            case 'C':
+                if((U_trim.thrust + delta_thrust) >=  max_thrust) {
+                  printf("Maximum Thrust Reached: Cannot Increase Thrust\n");
+                  U_trim.thrust = max_thrust;}
+                else {U_trim.thrust += delta_thrust; 
+                     printf("Increase Thrust: %f\n", U_trim.thrust);}
+              break;
+                
+            case 'v':
+            case 'V':
+                if((U_trim.thrust-=delta_thrust) <= 0) {
+                printf("Thrust is 0. Cannot decrease further\n");
+                U_trim.thrust = 0;}
+                else {U_trim.thrust -= delta_thrust;
+                      printf("Decrease Thrust: %f\n", U_trim.thrust);}
+              break;
+                
+            case 'g':
+            case 'G':
+                printf("Increase kd_phi and kd_theta\n");
+                gains.kd_phi   = gains.kd_phi   + 0.3;
+                gains.kd_theta = gains.kd_theta + 0.3;
+                break;
+                
+            case 'h':
+            case 'H':
+                printf("Decrease kd_phi and kd_theta\n");
+                gains.kd_phi   = gains.kd_phi   - 0.3;
+                gains.kd_theta = gains.kd_theta - 0.3;
+                break;
+                
+            case 'i':
+            case 'I':
+              printf("Reset Desired_positions to initial values\n");
+              desired_positions.x = init_positions.x;
+              desired_positions.y = init_positions.y;
+              desired_positions.z = init_positions.z;
+              break;
+            
+            case 'j':
+            case 'J':
+                printf("Reset desired_positions to current position (raw vicon)\n");
+                Vicon current_position;
+                get_vicon_data(usb_xbee, current_position);
+                desired_positions.x = current_position.x;
+                desired_positions.y = current_position.y;
+                desired_positions.z = current_position.z;
+                break;
+
+            case 'k':
+            case 'K':
+                printf("Increase kp_phi and kp_theta\n");
+                gains.kp_phi   = gains.kp_phi   + 0.1;
+                gains.kp_theta = gains.kp_theta + 0.1;
+                break;
+            
+            case 'm':
+            case 'M':
+                printf("ecrease kp_phi and kp_theta\n");
+                gains.kp_phi   = gains.kp_phi   - 0.1;
+                gains.kp_theta = gains.kp_theta - 0.1;    
+                break;
+
+            case 'l':
+            case 'L':
+                printf("Start/Stop Logging\n");
+                LOG_DATA = ~LOG_DATA;
+                break;
+                
+              //used after j: s,w,r,f,v
+              
+              //  printf("Control Landing: Not Implemented\n");
+              //t_landing = t;
+              //CTRL_LANDING = true;
+
+        }
+
+    }
+    pthread_exit(NULL);
+}
 void configure_threads(void){
     //pthread_t - is an abstract datatype that is used as a handle to reference the thread
      //threads[0] = control_stabilizer
@@ -534,7 +545,7 @@ void configure_threads(void){
      fifo_max_prio = sched_get_priority_max(SCHED_FIFO);
      fifo_min_prio = sched_get_priority_min(SCHED_FIFO); 
 
-     	// Create threads
+     	// reate threads
      
      printf("=> creating control_stabilizer thread\n");
      // Higher priority for filter

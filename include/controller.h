@@ -9,6 +9,7 @@
 #include "imu.h"
 #include "data_structs.h" // user defined structs (state, control_command,gains, desired_angles)
 #include "vicon.h" //DELETE THIS ONCE INTERPROCESS WORKS
+
 #include "logger.h"
 //#include "shared_data.hpp" //UNCOMMENT WHEN IMPLEMENTED
 
@@ -31,6 +32,9 @@
 #include <ncurses.h>
 #include <queue>
 #include <vector>
+
+#include <ctime>
+#include <iostream>
 
 #define NUM_THREADS 3
 #define PI 3.14159265359
@@ -71,6 +75,7 @@ Vicon vicon_velocity(Vicon& current, Vicon& old);
 void display_info(const State& imu_data, const State_Error& vicon_error, const State& imu_error, const Control_command& U, const Vicon& vicon, const Vicon& vicon_filt, const Vicon& vicon_vel, const Vicon& vicon_vel_filt, const Angles& desired_angles, const Times& times, const Times& time_m);
 void configure_threads(void);
 
+
 double tv2float (const timespec& time){
      return ((double) time.tv_sec + (time.tv_nsec / 1000000000.0));
 }
@@ -79,6 +84,7 @@ void set_timespec(timespec& x, timespec& y){
              x.tv_sec = y.tv_sec;
              x.tv_nsec = y.tv_nsec;
 }
+
 timespec diff(timespec start, timespec end){
      timespec temp;
      if ((end.tv_nsec-start.tv_nsec)<0) {
@@ -90,6 +96,7 @@ timespec diff(timespec start, timespec end){
      }
      return temp;
 }
+
 void time_calc(Times& times){
     //get current time, swap current and past, calc delta_t
     //printf("current time: %.8f  old time: %.8f  delta_t: %.8f\n", tv2float(times.current), tv2float(times.old), tv2float(times.delta));
@@ -104,6 +111,15 @@ void time_calc(Times& times){
     //set time_old to current time
     set_timespec(times.old, times.current);
 
+    time_t rawtime;
+    struct tm * timeinfo;
+    char buffer[80];
+    time (&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(buffer,80,"%d-%m-%Y %I:%M:%S",timeinfo);
+
+    //times.date_time = buffer;
+    strcpy(times.date_time,buffer); // myStr.c_str());
 }
 void set_initial_times(Times& times){                                                                                                                                                                       
         clock_gettime(CLOCK_REALTIME,&(times.current));
@@ -111,6 +127,7 @@ void set_initial_times(Times& times){
         clock_gettime(CLOCK_REALTIME,&(times.old_old));
         clock_gettime(CLOCK_REALTIME,&(times.delta));
 }
+
 void set_gains(Gains& gains){
     gains.kp_theta = 21.0;
     gains.kd_theta = 0.32;

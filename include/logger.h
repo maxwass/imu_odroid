@@ -5,6 +5,8 @@
 
 //=================================
 // included dependencies
+#include "data_structs.h"
+
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <iostream>
@@ -21,7 +23,6 @@
 #include <iomanip>
 #include <queue>
 #include <string>
-#include "data_structs.h"
 
 using namespace std;
 
@@ -34,7 +35,14 @@ class logger
     std::string filename;
     const char *filename_p;
     void unwrap(Data_log d);
-
+    void format(Vicon v);
+    void format(Times t);
+    void format(State s);
+    void format(State_Error se);
+    void format(Errors e);
+    void format(Motor_forces mf);
+    void format(Angles a);
+ 
    public:
     logger(std::string filename, int cycles_until_log);  // This is the constructor
     void log(Data_log d);
