@@ -107,7 +107,6 @@ void *control_stabilizer(void *thread_id){
         
 
         if (LOG_DATA)    { log_data(times, new_vicon, new_vicon_vel, new_filt_vicon, new_filt_vicon_vel, vicon_error, imu_data, imu_error, desired_angles);        }
-
         if (DISPLAY_RUN) { display_info(imu_data, vicon_error, imu_error, U, new_vicon, new_filt_vicon, new_vicon_vel, new_filt_vicon_vel, desired_angles, times, time_m); }
   
     }
